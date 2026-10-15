@@ -1,5 +1,0 @@
-EverAfter interaction sound effects
-
-The files `trip-card-zoom.wav` and `globe-entrance-swell.wav` were generated
-specifically for this project using synthesized tones and noise. They contain
-no third-party recordings or samples.
