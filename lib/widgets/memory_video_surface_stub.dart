@@ -1,7 +1,5 @@
 import 'package:flutter/widgets.dart';
 
-bool get usesWebMemoryVideoSurface => false;
-
 class WebMemoryVideoSurface extends StatelessWidget {
   const WebMemoryVideoSurface({
     required this.assetPath,

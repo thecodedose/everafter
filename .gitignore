@@ -25,7 +25,6 @@ migrate_working_dir/
 
 # Flutter/Dart/Pub related
 **/doc/api/
-**/ios/Flutter/.last_build_id
 .dart_tool/
 .flutter-plugins-dependencies
 .pub-cache/
@@ -39,10 +38,6 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
 
 # AI agent skills
 .agent
@@ -73,11 +68,8 @@ app.*.map.json
 /tmp/
 /design-qa.md
 
-# Restricted/non-redistributable media. The two synthesized sound effects and
-# the public-domain cursive font are allow-listed below.
+# Restricted media remains excluded from public commits.
 /assets/audio/*
-!/assets/audio/globe-entrance-swell.wav
-!/assets/audio/trip-card-zoom.wav
 /assets/fonts/golifez_bright_demo.otf
 /assets/licenses/epidemic_sound_fire_effect.txt
 /assets/licenses/golifez_bright_demo_eula.txt
@@ -107,7 +99,6 @@ app.*.map.json
 **/previews/
 **/snapshots/
 **/*_review.json
-!models/fridge_magnet/fridge_magnet.glb
 
 # Local agent/project instructions contain deployment-specific endpoints.
 /AGENTS.md

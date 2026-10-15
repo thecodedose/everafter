@@ -2,10 +2,9 @@ import 'dart:math' as math;
 
 import 'package:everafter/data/gallery_layout.dart';
 import 'package:everafter/data/gallery_memory_content.dart';
-import 'package:everafter/data/japan_instagram_posts.dart';
 import 'package:everafter/theme/everafter_theme.dart';
 import 'package:everafter/widgets/gallery_trinket_image.dart';
-import 'package:everafter/widgets/trip_gallery.dart';
+import 'package:everafter/data/trip_catalog.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -46,19 +45,50 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
             animation: _store,
             builder: (context, _) {
               final layout = _store.layoutFor(_tripSlug);
-              return Column(
-                children: <Widget>[
-                  _buildHeader(),
-                  Expanded(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        Expanded(child: _buildCanvas(layout)),
-                        SizedBox(width: 310, child: _buildInspector(layout)),
-                      ],
-                    ),
-                  ),
-                ],
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth < 900) {
+                    return DefaultTabController(
+                      length: 2,
+                      child: Column(
+                        children: <Widget>[
+                          _buildHeader(),
+                          const TabBar(
+                            tabs: <Widget>[
+                              Tab(text: 'Canvas'),
+                              Tab(text: 'Inspector'),
+                            ],
+                          ),
+                          Expanded(
+                            child: TabBarView(
+                              children: <Widget>[
+                                _buildCanvas(layout),
+                                _buildInspector(layout),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return Column(
+                    children: <Widget>[
+                      _buildHeader(),
+                      Expanded(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: <Widget>[
+                            Expanded(child: _buildCanvas(layout)),
+                            SizedBox(
+                              width: 310,
+                              child: _buildInspector(layout),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
               );
             },
           ),
@@ -69,137 +99,71 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
 
   Widget _buildHeader() {
     return Container(
-      height: 122,
-      padding: const EdgeInsets.fromLTRB(22, 6, 22, 8),
+      width: double.infinity,
+      padding: const EdgeInsets.all(8),
       decoration: const BoxDecoration(
         color: Color(0xFF231815),
         border: Border(bottom: BorderSide(color: Color(0xFF513B33))),
       ),
-      child: Column(
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: <Widget>[
-          Expanded(
-            child: Row(
-              children: <Widget>[
-                IconButton(
-                  tooltip: 'Back to EverAfter',
-                  onPressed: () => context.go('/'),
-                  color: EverAfterColors.agedPaper,
-                  icon: const Icon(Icons.arrow_back),
-                ),
-                const SizedBox(width: 8),
-                const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      'GALLERY ADMIN',
-                      style: TextStyle(
-                        color: EverAfterColors.agedPaper,
-                        fontFamily: 'Georgia',
-                        fontSize: 19,
-                        letterSpacing: 2.2,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(height: 3),
-                    Text(
-                      'Arrange frames and trinkets',
-                      style: TextStyle(color: Color(0xFFBCA99C), fontSize: 12),
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                OutlinedButton.icon(
-                  key: const ValueKey('admin-reset-layout'),
-                  onPressed: _confirmReset,
-                  icon: const Icon(Icons.restart_alt),
-                  label: const Text('Reset'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFE7C7B3),
-                    side: const BorderSide(color: Color(0xFF785C50)),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                FilledButton.icon(
-                  key: const ValueKey('admin-save-layout'),
-                  onPressed: _store.hasUnsavedChanges ? _save : null,
-                  icon: const Icon(Icons.save_outlined),
-                  label: Text(
-                    _store.hasUnsavedChanges
-                        ? (_store.editsGlobalLayout
-                              ? 'Save global'
-                              : 'Save this device')
-                        : 'Saved',
-                  ),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFB58A54),
-                    foregroundColor: const Color(0xFF24160E),
-                    disabledBackgroundColor: const Color(0xFF4A403A),
-                    disabledForegroundColor: const Color(0xFFA99D95),
-                  ),
-                ),
-              ],
+          IconButton(
+            tooltip: 'Back to EverAfter',
+            onPressed: () => context.go('/'),
+            icon: const Icon(Icons.arrow_back),
+          ),
+          const Text(
+            'GALLERY ADMIN',
+            style: TextStyle(
+              color: EverAfterColors.agedPaper,
+              fontFamily: 'Georgia',
+              fontSize: 19,
+              letterSpacing: 2.2,
             ),
           ),
-          Row(
-            children: <Widget>[
-              Container(
-                key: const ValueKey('admin-layout-scope'),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF352520),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFF654A40)),
-                ),
-                child: Text(
-                  _store.editsGlobalLayout
-                      ? 'GLOBAL LAYOUT'
-                      : 'THIS DEVICE ONLY',
-                  style: const TextStyle(
-                    color: Color(0xFFD7B27C),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              SizedBox(
-                width: 210,
-                child: DropdownButtonFormField<String>(
-                  key: const ValueKey('admin-trip-selector'),
-                  initialValue: _tripSlug,
-                  dropdownColor: const Color(0xFF352520),
-                  style: const TextStyle(color: EverAfterColors.paper),
-                  decoration: _fieldDecoration('Trip'),
-                  items: <DropdownMenuItem<String>>[
-                    for (final trip in tripGalleryItems)
-                      DropdownMenuItem(
-                        value: trip.slug,
-                        child: Text(trip.name),
-                      ),
-                  ],
-                  onChanged: (slug) {
-                    if (slug == null) return;
-                    setState(() {
-                      _tripSlug = slug;
-                      _selection = null;
-                    });
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              TextButton.icon(
-                key: const ValueKey('admin-travel-dates'),
-                onPressed: _editTravelDates,
-                icon: const Icon(Icons.date_range_outlined, size: 18),
-                label: const Text('Travel dates'),
-              ),
-            ],
+          SizedBox(
+            width: 180,
+            child: DropdownButtonFormField<String>(
+              key: const ValueKey('admin-trip-selector'),
+              initialValue: _tripSlug,
+              isExpanded: true,
+              dropdownColor: const Color(0xFF352520),
+              decoration: _fieldDecoration('Trip'),
+              items: <DropdownMenuItem<String>>[
+                for (final trip in tripGalleryItems)
+                  DropdownMenuItem(value: trip.slug, child: Text(trip.name)),
+              ],
+              onChanged: (slug) {
+                if (slug == null) return;
+                setState(() {
+                  _tripSlug = slug;
+                  _selection = null;
+                });
+              },
+            ),
           ),
+          TextButton.icon(
+            key: const ValueKey('admin-travel-dates'),
+            onPressed: _editTravelDates,
+            icon: const Icon(Icons.date_range_outlined, size: 18),
+            label: const Text('Travel dates'),
+          ),
+          OutlinedButton.icon(
+            key: const ValueKey('admin-reset-layout'),
+            onPressed: _confirmReset,
+            icon: const Icon(Icons.restart_alt),
+            label: const Text('Reset'),
+          ),
+          FilledButton.icon(
+            key: const ValueKey('admin-save-layout'),
+            onPressed: _store.hasUnsavedChanges ? _save : null,
+            icon: const Icon(Icons.save_outlined),
+            label: Text(_store.hasUnsavedChanges ? 'Export layout' : 'Saved'),
+          ),
+          const Text('GLOBAL LAYOUT', key: ValueKey('admin-layout-scope')),
         ],
       ),
     );
@@ -217,11 +181,15 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
         children: <Widget>[
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-            child: Row(
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 4,
+              runSpacing: 4,
               children: <Widget>[
                 const Icon(Icons.open_with, size: 16, color: Color(0xFFD4BFAF)),
                 const SizedBox(width: 8),
-                const Expanded(
+                const SizedBox(
+                  width: 190,
                   child: Text(
                     'Drag an item to move it. Select it, then drag its corner '
                     'to resize.',
@@ -521,6 +489,7 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
     final result = await _showAdminDialog<({DateTime? start, DateTime? end})>(
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          scrollable: true,
           key: const ValueKey('admin-travel-dates-dialog'),
           title: Text('${_trip.name} travel dates'),
           content: SizedBox(
@@ -610,68 +579,80 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
   Future<void> _addTrinket() async {
     final selection = await _showAdminDialog<_TrinketSelection>(
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.all(16),
+        contentPadding: const EdgeInsets.all(16),
         key: const ValueKey('admin-trinket-picker'),
         backgroundColor: const Color(0xFF251915),
         title: const Text('Add a trinket'),
         content: SizedBox(
           width: 680,
-          height: 430,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Expanded(
-                child: GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 1.15,
+          height:
+              (MediaQuery.sizeOf(context).height -
+                      MediaQuery.viewInsetsOf(context).bottom -
+                      200)
+                  .clamp(180.0, 430.0)
+                  .toDouble(),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                SizedBox(
+                  height: 240,
+                  child: GridView.builder(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                          childAspectRatio: 1.15,
+                        ),
+                    itemCount: galleryTrinketAssetChoices.length,
+                    itemBuilder: (context, index) {
+                      final asset = galleryTrinketAssetChoices[index];
+                      return InkWell(
+                        key: ValueKey('admin-trinket-choice-$index'),
+                        onTap: () => Navigator.pop(
+                          context,
+                          _TrinketSelection(
+                            source: asset,
+                            label: _trinketLabel(asset),
+                          ),
+                        ),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF130D0B),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFF5B443A)),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: Image.asset(asset, fit: BoxFit.contain),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                  itemCount: galleryTrinketAssetChoices.length,
-                  itemBuilder: (context, index) {
-                    final asset = galleryTrinketAssetChoices[index];
-                    return InkWell(
-                      key: ValueKey('admin-trinket-choice-$index'),
-                      onTap: () => Navigator.pop(
-                        context,
-                        _TrinketSelection(
-                          source: asset,
-                          label: _trinketLabel(asset),
-                        ),
-                      ),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF130D0B),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF5B443A)),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(10),
-                          child: Image.asset(asset, fit: BoxFit.contain),
-                        ),
-                      ),
-                    );
-                  },
                 ),
-              ),
-              const SizedBox(height: 14),
-              Container(
-                key: const ValueKey('admin-trinket-source-guidance'),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1210),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF5B443A)),
+                const SizedBox(height: 14),
+                Container(
+                  key: const ValueKey('admin-trinket-source-guidance'),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1210),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF5B443A)),
+                  ),
+                  child: const Text(
+                    'To add more trinkets, place PNG, JPEG, or WebP files in '
+                    'assets/images/experience/, add their asset paths to '
+                    'galleryTrinketAssetChoices in '
+                    'lib/data/gallery_memory_content.dart, then rebuild EverAfter.',
+                    style: TextStyle(color: Color(0xFFD4BFAF), height: 1.35),
+                  ),
                 ),
-                child: const Text(
-                  'To add more trinkets, place PNG, JPEG, or WebP files in '
-                  'assets/images/experience/, add their asset paths to '
-                  'galleryTrinketAssetChoices in '
-                  'lib/data/gallery_memory_content.dart, then rebuild EverAfter.',
-                  style: TextStyle(color: Color(0xFFD4BFAF), height: 1.35),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         actions: <Widget>[
@@ -799,9 +780,7 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
                               ),
                               const SizedBox(height: 5),
                               Text(
-                                _trip.name == 'Japan'
-                                    ? '16 FOOD MEMORIES'
-                                    : 'CAFÉS · MARKETS · MEALS',
+                                _trip.location.substring(0, 1).toUpperCase(),
                                 style: const TextStyle(
                                   fontFamily: 'Georgia',
                                   color: Color(0xFF755B3D),
@@ -839,7 +818,7 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
   }
 
   Widget _buildEditorialTitle() {
-    final left = _tripSlug == 'japan' ? 3635.0 : 3070.0;
+    const left = galleryEditorialTitleLeft;
     final dateRangeLabel = _store
         .layoutFor(_tripSlug)
         .effectiveDateRangeLabel(_trip.dateRangeLabel);
@@ -1132,7 +1111,8 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
   }
 
   Widget _buildInstagramPost(GalleryInstagramPlacement placement) {
-    final post = japanInstagramPosts[placement.postIndex];
+    final post = galleryVideoPostFor(_tripSlug, placement.postIndex);
+    if (post == null) return const SizedBox.shrink();
     final scaledWidth = placement.width * placement.scale;
     final scaledHeight = placement.height * placement.scale;
     final selected =
@@ -1260,7 +1240,7 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
                           '${_GalleryItemType.instagram.name}:'
                           '${instagramPost.id}',
                       child: Text(
-                        'Instagram post ${instagramPost.postIndex + 1}'
+                        'Video ${instagramPost.postIndex + 1}'
                         '${instagramPost.visible ? '' : ' (hidden)'}',
                       ),
                     ),
@@ -1321,28 +1301,30 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
   Widget _emptyInspector() {
     return Container(
       color: const Color(0xFF211714),
-      padding: const EdgeInsets.all(28),
-      child: const Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          Icon(Icons.touch_app, color: Color(0xFF8F786B), size: 42),
-          SizedBox(height: 14),
-          Text(
-            'Select a frame, trinket, Instagram post, or menu',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: EverAfterColors.agedPaper,
-              fontFamily: 'Georgia',
-              fontSize: 18,
+      child: const SingleChildScrollView(
+        padding: EdgeInsets.all(28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Icon(Icons.touch_app, color: Color(0xFF8F786B), size: 42),
+            SizedBox(height: 14),
+            Text(
+              'Select a frame, trinket, Video, or menu',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: EverAfterColors.agedPaper,
+                fontFamily: 'Georgia',
+                fontSize: 18,
+              ),
             ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Its position, size, rotation, and display options will appear here.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0xFFAD998D), height: 1.4),
-          ),
-        ],
+            SizedBox(height: 8),
+            Text(
+              'Its position, size, rotation, and display options will appear here.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFFAD998D), height: 1.4),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1570,231 +1552,211 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
               ? choices
               : edits.keys.toList(growable: false);
           return AlertDialog(
+            insetPadding: const EdgeInsets.all(16),
+            contentPadding: const EdgeInsets.all(16),
             key: const ValueKey('admin-photo-picker'),
             backgroundColor: const Color(0xFF251915),
             title: Text('Photos in frame ${frame.memoryIndex + 1}'),
             content: SizedBox(
               width: 960,
-              height: 520,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  Expanded(
-                    flex: 11,
-                    child: KeyedSubtree(
-                      key: const ValueKey('admin-photo-reposition-column'),
-                      child: activeAssetPath != null
-                          ? _PhotoCropEditor(
-                              key: ValueKey(
-                                'admin-photo-crop-$activeAssetPath',
-                              ),
-                              frameStyle: frame.style,
-                              frameAspectRatio: frame.width / frame.height,
-                              edit: edits[activeAssetPath]!,
-                              onChanged: (edit) {
-                                setDialogState(
-                                  () => edits[activeAssetPath!] = edit,
-                                );
-                              },
-                            )
-                          : const DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: Color(0xFF160F0D),
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(8),
-                                ),
-                                border: Border.fromBorderSide(
-                                  BorderSide(color: Color(0xFF5B443A)),
-                                ),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  'Select a photo to reposition it',
-                                  style: TextStyle(color: Color(0xFFB9A69B)),
-                                ),
-                              ),
+              height:
+                  (MediaQuery.sizeOf(context).height -
+                          MediaQuery.viewInsetsOf(context).bottom -
+                          200)
+                      .clamp(160.0, 520.0)
+                      .toDouble(),
+              child: _ResponsivePhotoPicker(
+                crop: KeyedSubtree(
+                  key: const ValueKey('admin-photo-reposition-column'),
+                  child: activeAssetPath != null
+                      ? _PhotoCropEditor(
+                          key: ValueKey('admin-photo-crop-$activeAssetPath'),
+                          frameStyle: frame.style,
+                          frameAspectRatio: frame.width / frame.height,
+                          edit: edits[activeAssetPath]!,
+                          onChanged: (edit) {
+                            setDialogState(
+                              () => edits[activeAssetPath!] = edit,
+                            );
+                          },
+                        )
+                      : const DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Color(0xFF160F0D),
+                            borderRadius: BorderRadius.all(Radius.circular(8)),
+                            border: Border.fromBorderSide(
+                              BorderSide(color: Color(0xFF5B443A)),
                             ),
-                    ),
-                  ),
-                  const SizedBox(width: 18),
-                  const VerticalDivider(color: Color(0xFF4A3730), width: 1),
-                  const SizedBox(width: 18),
-                  Expanded(
-                    flex: 9,
-                    child: KeyedSubtree(
-                      key: const ValueKey('admin-photo-gallery-column'),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Row(
-                            children: <Widget>[
-                              Expanded(
-                                child: Text(
-                                  showPhotoLibrary
-                                      ? '${edits.length} selected · '
-                                            '${choices.length} available for '
-                                            '${_trip.name}'
-                                      : '${edits.length} photo'
-                                            '${edits.length == 1 ? '' : 's'} '
-                                            'in this frame',
-                                  style: const TextStyle(
-                                    color: Color(0xFFB9A69B),
-                                  ),
-                                ),
-                              ),
-                              TextButton.icon(
-                                key: const ValueKey('admin-add-frame-photos'),
-                                onPressed: () => setDialogState(
-                                  () => showPhotoLibrary = !showPhotoLibrary,
-                                ),
-                                icon: Icon(
-                                  showPhotoLibrary
-                                      ? Icons.check
-                                      : Icons.add_photo_alternate_outlined,
-                                  size: 17,
-                                ),
-                                label: Text(
-                                  showPhotoLibrary
-                                      ? 'Done adding'
-                                      : 'Add photos',
-                                ),
-                              ),
-                            ],
                           ),
-                          const SizedBox(height: 10),
+                          child: Center(
+                            child: Text(
+                              'Select a photo to reposition it',
+                              style: TextStyle(color: Color(0xFFB9A69B)),
+                            ),
+                          ),
+                        ),
+                ),
+                library: KeyedSubtree(
+                  key: const ValueKey('admin-photo-gallery-column'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Row(
+                        children: <Widget>[
                           Expanded(
-                            child: displayedChoices.isEmpty
-                                ? const Center(
-                                    child: Text(
-                                      'No photos in this frame yet.\n'
-                                      'Choose Add photos to select some.',
-                                      key: ValueKey('admin-empty-frame-photos'),
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: Color(0xFFB9A69B),
-                                      ),
-                                    ),
-                                  )
-                                : GridView.builder(
-                                    key: ValueKey(
-                                      showPhotoLibrary
-                                          ? 'admin-photo-library'
-                                          : 'admin-applied-photos',
-                                    ),
-                                    gridDelegate:
-                                        const SliverGridDelegateWithFixedCrossAxisCount(
-                                          crossAxisCount: 3,
-                                          mainAxisSpacing: 10,
-                                          crossAxisSpacing: 10,
-                                          childAspectRatio: 1.08,
-                                        ),
-                                    itemCount: displayedChoices.length,
-                                    itemBuilder: (context, index) {
-                                      final assetPath = displayedChoices[index];
-                                      final libraryIndex = choices.indexOf(
-                                        assetPath,
-                                      );
-                                      final isSelected = edits.containsKey(
-                                        assetPath,
-                                      );
-                                      final isActive =
-                                          activeAssetPath == assetPath;
-                                      return InkWell(
-                                        key: ValueKey(
-                                          'admin-photo-choice-$libraryIndex',
-                                        ),
-                                        onTap: () {
-                                          setDialogState(() {
-                                            if (!isSelected) {
-                                              edits[assetPath] =
-                                                  GalleryPhotoEdit(
-                                                    assetPath: assetPath,
-                                                    alignmentX:
-                                                        frame.alignmentX,
-                                                    alignmentY:
-                                                        frame.alignmentY,
-                                                  );
-                                            }
-                                            activeAssetPath = assetPath;
-                                          });
-                                        },
-                                        child: Stack(
-                                          fit: StackFit.expand,
-                                          children: <Widget>[
-                                            ClipRRect(
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
-                                              child: Image.asset(
-                                                assetPath,
-                                                fit: BoxFit.cover,
-                                              ),
-                                            ),
-                                            DecoratedBox(
-                                              decoration: BoxDecoration(
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                                border: Border.all(
-                                                  color: isSelected
-                                                      ? isActive
-                                                            ? const Color(
-                                                                0xFFFFD98B,
-                                                              )
-                                                            : const Color(
-                                                                0xFFB58A54,
-                                                              )
-                                                      : const Color(0x665C493F),
-                                                  width: isSelected ? 3 : 1,
-                                                ),
-                                              ),
-                                            ),
-                                            if (isSelected)
-                                              Positioned(
-                                                top: 4,
-                                                right: 4,
-                                                child: GestureDetector(
-                                                  key: ValueKey(
-                                                    'admin-remove-photo-$libraryIndex',
-                                                  ),
-                                                  onTap: () {
-                                                    setDialogState(() {
-                                                      edits.remove(assetPath);
-                                                      if (activeAssetPath ==
-                                                          assetPath) {
-                                                        activeAssetPath = edits
-                                                            .keys
-                                                            .firstOrNull;
-                                                      }
-                                                    });
-                                                  },
-                                                  child: const DecoratedBox(
-                                                    decoration: BoxDecoration(
-                                                      color: Color(0xCC231511),
-                                                      shape: BoxShape.circle,
-                                                    ),
-                                                    child: Padding(
-                                                      padding: EdgeInsets.all(
-                                                        3,
-                                                      ),
-                                                      child: Icon(
-                                                        Icons.close,
-                                                        color: Colors.white,
-                                                        size: 17,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  ),
+                            child: Text(
+                              showPhotoLibrary
+                                  ? '${edits.length} selected · '
+                                        '${choices.length} available for '
+                                        '${_trip.name}'
+                                  : '${edits.length} photo'
+                                        '${edits.length == 1 ? '' : 's'} '
+                                        'in this frame',
+                              style: const TextStyle(color: Color(0xFFB9A69B)),
+                            ),
+                          ),
+                          TextButton.icon(
+                            key: const ValueKey('admin-add-frame-photos'),
+                            onPressed: () => setDialogState(
+                              () => showPhotoLibrary = !showPhotoLibrary,
+                            ),
+                            icon: Icon(
+                              showPhotoLibrary
+                                  ? Icons.check
+                                  : Icons.add_photo_alternate_outlined,
+                              size: 17,
+                            ),
+                            label: Text(
+                              showPhotoLibrary ? 'Done adding' : 'Add photos',
+                            ),
                           ),
                         ],
                       ),
-                    ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: displayedChoices.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'No photos in this frame yet.\n'
+                                  'Choose Add photos to select some.',
+                                  key: ValueKey('admin-empty-frame-photos'),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Color(0xFFB9A69B)),
+                                ),
+                              )
+                            : GridView.builder(
+                                key: ValueKey(
+                                  showPhotoLibrary
+                                      ? 'admin-photo-library'
+                                      : 'admin-applied-photos',
+                                ),
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 3,
+                                      mainAxisSpacing: 10,
+                                      crossAxisSpacing: 10,
+                                      childAspectRatio: 1.08,
+                                    ),
+                                itemCount: displayedChoices.length,
+                                itemBuilder: (context, index) {
+                                  final assetPath = displayedChoices[index];
+                                  final libraryIndex = choices.indexOf(
+                                    assetPath,
+                                  );
+                                  final isSelected = edits.containsKey(
+                                    assetPath,
+                                  );
+                                  final isActive = activeAssetPath == assetPath;
+                                  return InkWell(
+                                    key: ValueKey(
+                                      'admin-photo-choice-$libraryIndex',
+                                    ),
+                                    onTap: () {
+                                      setDialogState(() {
+                                        if (!isSelected) {
+                                          edits[assetPath] = GalleryPhotoEdit(
+                                            assetPath: assetPath,
+                                            alignmentX: frame.alignmentX,
+                                            alignmentY: frame.alignmentY,
+                                          );
+                                        }
+                                        activeAssetPath = assetPath;
+                                      });
+                                    },
+                                    child: Stack(
+                                      fit: StackFit.expand,
+                                      children: <Widget>[
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                          child: Image.asset(
+                                            assetPath,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                        DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                            border: Border.all(
+                                              color: isSelected
+                                                  ? isActive
+                                                        ? const Color(
+                                                            0xFFFFD98B,
+                                                          )
+                                                        : const Color(
+                                                            0xFFB58A54,
+                                                          )
+                                                  : const Color(0x665C493F),
+                                              width: isSelected ? 3 : 1,
+                                            ),
+                                          ),
+                                        ),
+                                        if (isSelected)
+                                          Positioned(
+                                            top: 4,
+                                            right: 4,
+                                            child: GestureDetector(
+                                              key: ValueKey(
+                                                'admin-remove-photo-$libraryIndex',
+                                              ),
+                                              onTap: () {
+                                                setDialogState(() {
+                                                  edits.remove(assetPath);
+                                                  if (activeAssetPath ==
+                                                      assetPath) {
+                                                    activeAssetPath =
+                                                        edits.keys.firstOrNull;
+                                                  }
+                                                });
+                                              },
+                                              child: const DecoratedBox(
+                                                decoration: BoxDecoration(
+                                                  color: Color(0xCC231511),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Padding(
+                                                  padding: EdgeInsets.all(3),
+                                                  child: Icon(
+                                                    Icons.close,
+                                                    color: Colors.white,
+                                                    size: 17,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
             actions: <Widget>[
@@ -1899,10 +1861,11 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
   }
 
   Widget _instagramInspector(GalleryInstagramPlacement placement) {
-    final post = japanInstagramPosts[placement.postIndex];
+    final post = galleryVideoPostFor(_tripSlug, placement.postIndex);
+    if (post == null) return _emptyInspector();
     return _inspectorShell(
-      title: 'Instagram post ${placement.postIndex + 1}',
-      subtitle: 'Japan reel',
+      title: 'Video ${placement.postIndex + 1}',
+      subtitle: '${_trip.name} video',
       visible: placement.visible,
       onVisibleChanged: (visible) => _store.updateInstagramPost(
         _tripSlug,
@@ -2037,6 +2000,7 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
     return Material(
       color: const Color(0xFF211714),
       child: ListView(
+        key: const ValueKey('admin-inspector-scroll'),
         padding: const EdgeInsets.all(22),
         children: <Widget>[
           Text(
@@ -2170,15 +2134,11 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
   Future<void> _save() async {
     try {
       await _store.save();
-    } on Exception catch (error) {
+    } on Object catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            _store.editsGlobalLayout
-                ? 'Could not save the global layout. $error'
-                : 'Could not save on this device. $error',
-          ),
+          content: Text('Layout export cancelled or failed. $error'),
           backgroundColor: const Color(0xFF8A2F2F),
         ),
       );
@@ -2186,11 +2146,9 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
     }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      const SnackBar(
         content: Text(
-          _store.editsGlobalLayout
-              ? 'Global layout JSON saved. Rebuild devices to bundle it.'
-              : 'Device-specific gallery layout saved.',
+          'Layout export requested. Replace the source JSON and redeploy to share changes.',
         ),
       ),
     );
@@ -2432,6 +2390,56 @@ class _TravelDateButton extends StatelessWidget {
   }
 }
 
+class _ResponsivePhotoPicker extends StatelessWidget {
+  const _ResponsivePhotoPicker({required this.crop, required this.library});
+
+  final Widget crop;
+  final Widget library;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 700) {
+          return DefaultTabController(
+            length: 2,
+            child: Column(
+              children: <Widget>[
+                const TabBar(
+                  tabs: <Widget>[
+                    Tab(text: 'Crop'),
+                    Tab(text: 'Photos'),
+                  ],
+                ),
+                Expanded(
+                  child: TabBarView(
+                    children: <Widget>[
+                      SingleChildScrollView(
+                        child: SizedBox(height: 360, child: crop),
+                      ),
+                      library,
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Expanded(flex: 11, child: crop),
+            const SizedBox(width: 18),
+            const VerticalDivider(color: Color(0xFF4A3730), width: 1),
+            const SizedBox(width: 18),
+            Expanded(flex: 9, child: library),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _PhotoCropEditor extends StatelessWidget {
   const _PhotoCropEditor({
     required this.frameStyle,
@@ -2551,80 +2559,78 @@ class _PhotoCropEditor extends StatelessWidget {
               ),
             ),
           ),
-          SizedBox(
-            height: 132,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  const Text(
-                    'DRAG TO REPOSITION',
-                    style: TextStyle(
-                      color: Color(0xFFB58A54),
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                  'DRAG TO REPOSITION',
+                  style: TextStyle(
+                    color: Color(0xFFB58A54),
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: <Widget>[
+                    const Icon(
+                      Icons.zoom_out,
+                      color: Color(0xFFD4BFAF),
+                      size: 18,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: <Widget>[
-                      const Icon(
-                        Icons.zoom_out,
-                        color: Color(0xFFD4BFAF),
-                        size: 18,
+                    Expanded(
+                      child: Slider(
+                        key: const ValueKey('admin-photo-zoom-slider'),
+                        value: edit.zoom,
+                        min: 1,
+                        max: 3,
+                        divisions: 40,
+                        activeColor: const Color(0xFFB58A54),
+                        onChanged: (zoom) =>
+                            onChanged(edit.copyWith(zoom: zoom)),
                       ),
-                      Expanded(
-                        child: Slider(
-                          key: const ValueKey('admin-photo-zoom-slider'),
-                          value: edit.zoom,
-                          min: 1,
-                          max: 3,
-                          divisions: 40,
-                          activeColor: const Color(0xFFB58A54),
-                          onChanged: (zoom) =>
-                              onChanged(edit.copyWith(zoom: zoom)),
+                    ),
+                    const Icon(
+                      Icons.zoom_in,
+                      color: Color(0xFFD4BFAF),
+                      size: 18,
+                    ),
+                  ],
+                ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 2,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: <Widget>[
+                    Text(
+                      'Zoom ${edit.zoom.toStringAsFixed(2)}×',
+                      style: const TextStyle(
+                        color: Color(0xFFB9A69B),
+                        fontSize: 11,
+                      ),
+                    ),
+                    TextButton(
+                      key: const ValueKey('admin-reset-photo-crop'),
+                      style: TextButton.styleFrom(
+                        minimumSize: Size.zero,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 4,
                         ),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      const Icon(
-                        Icons.zoom_in,
-                        color: Color(0xFFD4BFAF),
-                        size: 18,
+                      onPressed: () => onChanged(
+                        GalleryPhotoEdit(assetPath: edit.assetPath),
                       ),
-                    ],
-                  ),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 2,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: <Widget>[
-                      Text(
-                        'Zoom ${edit.zoom.toStringAsFixed(2)}×',
-                        style: const TextStyle(
-                          color: Color(0xFFB9A69B),
-                          fontSize: 11,
-                        ),
-                      ),
-                      TextButton(
-                        key: const ValueKey('admin-reset-photo-crop'),
-                        style: TextButton.styleFrom(
-                          minimumSize: Size.zero,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 4,
-                          ),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        onPressed: () => onChanged(
-                          GalleryPhotoEdit(assetPath: edit.assetPath),
-                        ),
-                        child: const Text('Reset crop'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                      child: const Text('Reset crop'),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],

@@ -1,208 +1,10 @@
-import 'package:everafter/data/public_demo_assets.dart';
+import 'package:everafter/data/gallery_memory_content.dart';
+import 'package:everafter/models/gallery_media.dart';
 import 'package:everafter/theme/everafter_theme.dart';
 import 'package:everafter/widgets/museum_widgets.dart';
-import 'package:everafter/widgets/trip_gallery.dart';
+import 'package:everafter/data/trip_catalog.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-
-class TasteMemory {
-  const TasteMemory({
-    required this.place,
-    required this.city,
-    required this.dish,
-    required this.note,
-    required this.detail,
-    required this.assetPath,
-    required this.accessionNumber,
-  });
-
-  final String place;
-  final String city;
-  final String dish;
-  final String note;
-  final String detail;
-  final String assetPath;
-  final String accessionNumber;
-}
-
-const List<TasteMemory> tasteOfJapanMemories = <TasteMemory>[
-  TasteMemory(
-    place: 'Conveyor-belt Sushi',
-    city: 'Tokyo',
-    dish: 'Nigiri & spicy noodles',
-    note:
-        'Colourful plates of nigiri beside a steaming bowl.\nOur Tokyo table, exactly as we remember it.',
-    detail:
-        'Tuna, salmon, ginger, and a hot bowl of spicy noodles gathered around the conveyor-belt counter.',
-    assetPath: publicMemoryPlaceholderAsset,
-    accessionNumber: 'EA-JP-001',
-  ),
-  TasteMemory(
-    place: 'Soba Counter',
-    city: 'Tokyo',
-    dish: 'Tempura soba set',
-    note:
-        'Crisp tempura, cool soba, and a giant kakiage.\nA whole lunch arranged on one tray.',
-    detail:
-        'A generous soba set with dipping sauce, shredded vegetables, tempura, and a golden vegetable fritter.',
-    assetPath: publicMemoryPlaceholderAsset,
-    accessionNumber: 'EA-JP-002',
-  ),
-  TasteMemory(
-    place: 'Street Snack Stand',
-    city: 'Tokyo',
-    dish: 'Spiral potato',
-    note:
-        'A paper cup, a long skewer, and a tower of crisp potato.\nThe perfect walking snack.',
-    detail:
-        'Thin potato spirals fried until golden and dusted with seasoning, photographed just before the first bite.',
-    assetPath: publicMemoryPlaceholderAsset,
-    accessionNumber: 'EA-JP-003',
-  ),
-  TasteMemory(
-    place: 'Kyoto Street Stall',
-    city: 'Kyoto',
-    dish: 'Taiyaki',
-    note:
-        'Still warm and wrapped in paper.\nA fish-shaped sweet carried through Kyoto.',
-    detail:
-        'A freshly baked taiyaki, held in one hand while the street blurred softly behind it.',
-    assetPath: publicMemoryPlaceholderAsset,
-    accessionNumber: 'EA-JP-004',
-  ),
-  TasteMemory(
-    place: 'Matcha Stop',
-    city: 'Kyoto',
-    dish: 'Matcha soft serve',
-    note:
-        'Deep green soft serve with a crisp cone.\nA cool pause between Kyoto streets.',
-    detail:
-        'A tall swirl of matcha ice cream photographed against the warm wood of the shopfront.',
-    assetPath: publicMemoryPlaceholderAsset,
-    accessionNumber: 'EA-JP-005',
-  ),
-  TasteMemory(
-    place: 'Matcha Republic',
-    city: 'Uji',
-    dish: 'Layered matcha drink',
-    note:
-        'Cream, milk, and matcha stacked in soft layers.\nAlmost too pretty to stir.',
-    detail:
-        'A chilled matcha drink from Uji, with a vivid green base fading upward through milk and cream.',
-    assetPath: publicMemoryPlaceholderAsset,
-    accessionNumber: 'EA-JP-006',
-  ),
-  TasteMemory(
-    place: 'Kyoto Patisserie',
-    city: 'Kyoto',
-    dish: 'Strawberry shortcake',
-    note:
-        'Soft sponge, fresh cream, and bright strawberries.\nA small, immaculate slice.',
-    detail:
-        'The classic strawberry cake arrived as a neat wedge, topped with cream and one glossy berry.',
-    assetPath: publicMemoryPlaceholderAsset,
-    accessionNumber: 'EA-JP-007',
-  ),
-  TasteMemory(
-    place: 'Kyoto Patisserie',
-    city: 'Kyoto',
-    dish: 'Blueberry tart',
-    note:
-        'A tiny tart crowded with blueberries.\nGlossy fruit over a crisp pastry shell.',
-    detail:
-        'A berry-covered tart with custard beneath, photographed on the café table before we shared it.',
-    assetPath: publicMemoryPlaceholderAsset,
-    accessionNumber: 'EA-JP-008',
-  ),
-  TasteMemory(
-    place: 'Pancake Café',
-    city: 'Kyoto',
-    dish: 'Strawberry soufflé pancakes',
-    note:
-        'Pillowy pancakes under strawberries and cream.\nDessert with impossible height.',
-    detail:
-        'Two airy pancakes topped with fresh strawberries, whipped cream, sauce, and a dusting of sugar.',
-    assetPath: publicMemoryPlaceholderAsset,
-    accessionNumber: 'EA-JP-009',
-  ),
-  TasteMemory(
-    place: 'Dinner Table',
-    city: 'Kyoto',
-    dish: 'Kimchi pancake',
-    note:
-        'Crisp edges and a soft, savoury centre.\nOne evening, one shared plate.',
-    detail:
-        'A hot kimchi pancake cut into wedges and photographed at the table before everyone reached in.',
-    assetPath: publicMemoryPlaceholderAsset,
-    accessionNumber: 'EA-JP-010',
-  ),
-  TasteMemory(
-    place: 'Hanami Snack Stall',
-    city: 'Kyoto',
-    dish: 'Hanami dango',
-    note:
-        'Pink, white, and green on one skewer.\nA springtime sweet made for wandering.',
-    detail:
-        'Three soft rice dumplings in the colours of blossom season, held up against the Kyoto street.',
-    assetPath: publicMemoryPlaceholderAsset,
-    accessionNumber: 'EA-JP-011',
-  ),
-  TasteMemory(
-    place: 'Udon Counter',
-    city: 'Osaka',
-    dish: 'Udon',
-    note:
-        'Thick noodles, a bright egg yolk, and scallions.\nSimple, glossy, satisfying.',
-    detail:
-        'A bowl of springy udon dressed with egg, greens, sesame, and crisp tempura crumbs.',
-    assetPath: publicMemoryPlaceholderAsset,
-    accessionNumber: 'EA-JP-012',
-  ),
-  TasteMemory(
-    place: 'Osaka Sweet Shop',
-    city: 'Osaka',
-    dish: 'Strawberry daifuku',
-    note:
-        'A whole strawberry tucked into soft mochi.\nSweet, chewy, and gone too quickly.',
-    detail:
-        'The daifuku was split open to reveal bright fruit, red bean filling, and a delicate mochi shell.',
-    assetPath: publicMemoryPlaceholderAsset,
-    accessionNumber: 'EA-JP-013',
-  ),
-  TasteMemory(
-    place: 'Nara Café',
-    city: 'Nara',
-    dish: 'Berry soda & macarons',
-    note:
-        'A sparkling berry drink with two tiny companions.\nThe most playful café table of the trip.',
-    detail:
-        'A ruby soda crowned with berries, served beside two character-shaped macarons on a wooden tray.',
-    assetPath: publicMemoryPlaceholderAsset,
-    accessionNumber: 'EA-JP-014',
-  ),
-  TasteMemory(
-    place: 'Curry House',
-    city: 'Nara',
-    dish: 'Vegetable curry',
-    note:
-        'Rice, roasted vegetables, and two curries.\nA colourful plate after a long walk.',
-    detail:
-        'A generous curry plate with grains, greens, roasted vegetables, pickles, and contrasting sauces.',
-    assetPath: publicMemoryPlaceholderAsset,
-    accessionNumber: 'EA-JP-015',
-  ),
-  TasteMemory(
-    place: 'Nara Bakery',
-    city: 'Nara',
-    dish: 'Strawberry cream buns',
-    note:
-        'Golden buns filled with cream and berries.\nA bakery-window choice with no regrets.',
-    detail:
-        'Two soft pastries filled with whipped cream and fresh strawberries, dusted lightly with sugar.',
-    assetPath: publicMemoryPlaceholderAsset,
-    accessionNumber: 'EA-JP-016',
-  ),
-];
 
 class TripTasteMenuScreen extends StatefulWidget {
   const TripTasteMenuScreen({required this.trip, super.key});
@@ -250,7 +52,7 @@ class _TripTasteMenuScreenState extends State<TripTasteMenuScreen>
     if (!mounted) return;
 
     if (!context.canPop()) {
-      context.go('/');
+      context.go('/trips/${widget.trip.slug}');
       return;
     }
 
@@ -264,14 +66,14 @@ class _TripTasteMenuScreenState extends State<TripTasteMenuScreen>
 
   @override
   Widget build(BuildContext context) {
-    final selected = tasteOfJapanMemories[_selectedIndex];
-
+    final memories = galleryTasteMemoriesFor(widget.trip.slug);
+    final selected = memories.isEmpty
+        ? null
+        : memories[_selectedIndex.clamp(0, memories.length - 1).toInt()];
     return PopScope<void>(
       canPop: _allowPop,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) {
-          _closeToGallery();
-        }
+        if (!didPop) _closeToGallery();
       },
       child: PaperScaffold(
         includeDust: true,
@@ -283,72 +85,96 @@ class _TripTasteMenuScreenState extends State<TripTasteMenuScreen>
             curve: Curves.easeOutCubic,
             reverseCurve: Curves.easeInCubic,
           ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(36, 22, 36, 28),
-            child: Column(
-              children: <Widget>[
-                _TasteRevealStage(
-                  key: const ValueKey('taste-reveal-header'),
-                  animation: _contentController,
-                  start: 0,
-                  end: 0.36,
-                  child: _TasteHeader(
-                    trip: widget.trip,
-                    onBack: _closeToGallery,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact =
+                  constraints.maxWidth < 700 || constraints.maxHeight < 620;
+              final header = _TasteRevealStage(
+                key: const ValueKey('taste-reveal-header'),
+                animation: _contentController,
+                start: 0,
+                end: 0.36,
+                child: _TasteHeader(trip: widget.trip, onBack: _closeToGallery),
+              );
+              final memory = selected == null
+                  ? const SizedBox.shrink()
+                  : _TasteRevealStage(
+                      key: const ValueKey('taste-reveal-memory'),
+                      animation: _contentController,
+                      start: 0.16,
+                      end: 0.7,
+                      child: _LayeredPaperCard(
+                        child: _SelectedTasteMemory(
+                          key: ValueKey(
+                            'taste-detail-${selected.accessionNumber}',
+                          ),
+                          memory: selected,
+                          totalCount: memories.length,
+                          index: _selectedIndex,
+                        ),
+                      ),
+                    );
+              final ledger = _TasteRevealStage(
+                key: const ValueKey('taste-reveal-ledger'),
+                animation: _contentController,
+                start: 0.38,
+                end: 1,
+                child: _LayeredPaperCard(
+                  child: _TasteLedger(
+                    memories: memories,
+                    controller: _ledgerController,
+                    selectedIndex: _selectedIndex,
+                    onSelected: (index) =>
+                        setState(() => _selectedIndex = index),
                   ),
                 ),
-                const SizedBox(height: 12),
-                Expanded(
-                  child: widget.trip.slug == 'japan'
-                      ? Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: <Widget>[
-                            Expanded(
-                              child: _TasteRevealStage(
-                                key: const ValueKey('taste-reveal-memory'),
-                                animation: _contentController,
-                                start: 0.16,
-                                end: 0.7,
-                                child: _LayeredPaperCard(
-                                  child: _SelectedTasteMemory(
-                                    key: ValueKey(
-                                      'taste-detail-${selected.accessionNumber}',
-                                    ),
-                                    memory: selected,
-                                    index: _selectedIndex,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 28),
-                            Expanded(
-                              child: _TasteRevealStage(
-                                key: const ValueKey('taste-reveal-ledger'),
-                                animation: _contentController,
-                                start: 0.38,
-                                end: 1,
-                                child: _LayeredPaperCard(
-                                  child: _TasteLedger(
-                                    controller: _ledgerController,
-                                    selectedIndex: _selectedIndex,
-                                    onSelected: (index) =>
-                                        setState(() => _selectedIndex = index),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        )
-                      : _TasteRevealStage(
-                          key: const ValueKey('taste-reveal-empty-collection'),
-                          animation: _contentController,
-                          start: 0.16,
-                          end: 0.82,
-                          child: _UncuratedTasteCollection(trip: widget.trip),
-                        ),
+              );
+              final uncurated = _TasteRevealStage(
+                key: const ValueKey('taste-reveal-empty-collection'),
+                animation: _contentController,
+                start: 0.16,
+                end: 0.82,
+                child: _UncuratedTasteCollection(trip: widget.trip),
+              );
+              if (compact) {
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                  child: Column(
+                    children: <Widget>[
+                      header,
+                      const SizedBox(height: 12),
+                      if (memories.isNotEmpty) ...<Widget>[
+                        SizedBox(height: 600, child: memory),
+                        const SizedBox(height: 20),
+                        SizedBox(height: 600, child: ledger),
+                      ] else
+                        SizedBox(height: 600, child: uncurated),
+                    ],
+                  ),
+                );
+              }
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(36, 22, 36, 28),
+                child: Column(
+                  children: <Widget>[
+                    header,
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: memories.isNotEmpty
+                          ? Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: <Widget>[
+                                Expanded(child: memory),
+                                const SizedBox(width: 28),
+                                Expanded(child: ledger),
+                              ],
+                            )
+                          : uncurated,
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -409,20 +235,28 @@ class _TasteHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final compact = MediaQuery.sizeOf(context).width < 700;
     return SizedBox(
       height: 68,
       child: Row(
         children: <Widget>[
           SizedBox(
-            width: 220,
+            width: compact ? 48 : 220,
             child: Align(
               alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                key: const ValueKey('taste-back-to-gallery'),
-                onPressed: onBack,
-                icon: const Icon(Icons.arrow_back, size: 16),
-                label: const Text('BACK TO GALLERY'),
-              ),
+              child: compact
+                  ? IconButton(
+                      key: const ValueKey('taste-back-to-gallery'),
+                      tooltip: 'Back to gallery',
+                      onPressed: onBack,
+                      icon: const Icon(Icons.arrow_back),
+                    )
+                  : TextButton.icon(
+                      key: const ValueKey('taste-back-to-gallery'),
+                      onPressed: onBack,
+                      icon: const Icon(Icons.arrow_back, size: 16),
+                      label: const Text('BACK TO GALLERY'),
+                    ),
             ),
           ),
           Expanded(
@@ -466,7 +300,7 @@ class _TasteHeader extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 220),
+          SizedBox(width: compact ? 48 : 220),
         ],
       ),
     );
@@ -558,11 +392,13 @@ class _SelectedTasteMemory extends StatelessWidget {
   const _SelectedTasteMemory({
     required this.memory,
     required this.index,
+    required this.totalCount,
     super.key,
   });
 
   final TasteMemory memory;
   final int index;
+  final int totalCount;
 
   @override
   Widget build(BuildContext context) {
@@ -612,8 +448,9 @@ class _SelectedTasteMemory extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 5),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: <Widget>[
                 Text(
                   memory.dish.toUpperCase(),
@@ -661,8 +498,9 @@ class _SelectedTasteMemory extends StatelessWidget {
               color: EverAfterColors.ink.withValues(alpha: 0.22),
             ),
             const SizedBox(height: 9),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: <Widget>[
                 Text(
                   'EVERAFTER COLLECTION',
@@ -672,7 +510,7 @@ class _SelectedTasteMemory extends StatelessWidget {
                 const Icon(Icons.diamond_outlined, size: 8),
                 const SizedBox(width: 12),
                 Text(
-                  '${index + 1} OF ${tasteOfJapanMemories.length}',
+                  '${index + 1} OF $totalCount',
                   style: textTheme.labelSmall?.copyWith(fontSize: 7.5),
                 ),
               ],
@@ -854,236 +692,17 @@ class _LayeredPaperCard extends StatelessWidget {
 
 // Retained as an unused archive of the later lace-menu experiment.
 // ignore: unused_element
-class _TasteMemoryStrip extends StatelessWidget {
-  const _TasteMemoryStrip({
-    required this.controller,
-    required this.selectedIndex,
-    required this.onSelected,
-  });
 
-  final ScrollController controller;
-  final int selectedIndex;
-  final ValueChanged<int> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(color: Color(0x00FFFFFF)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
-        child: Column(
-          children: <Widget>[
-            const SizedBox(
-              key: ValueKey('taste-select-a-memory-card'),
-              height: 48,
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 4),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: <Widget>[
-                    Row(
-                      children: <Widget>[
-                        Expanded(
-                          child: Divider(
-                            color: Color(0x889B7642),
-                            indent: 18,
-                            endIndent: 8,
-                          ),
-                        ),
-                        Icon(
-                          Icons.diamond_outlined,
-                          size: 10,
-                          color: Color(0xFF9B7642),
-                        ),
-                        SizedBox(width: 8),
-                        Text(
-                          'THE MENU',
-                          style: TextStyle(
-                            fontFamily: 'Georgia',
-                            color: Color(0xFF2A2520),
-                            fontSize: 21,
-                            height: 1,
-                            letterSpacing: 1.8,
-                            decoration: TextDecoration.none,
-                          ),
-                        ),
-                        SizedBox(width: 8),
-                        Icon(
-                          Icons.diamond_outlined,
-                          size: 10,
-                          color: Color(0xFF9B7642),
-                        ),
-                        Expanded(
-                          child: Divider(
-                            color: Color(0x889B7642),
-                            indent: 8,
-                            endIndent: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 5),
-                    Text(
-                      'SELECT A MEMORY',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: 'Georgia',
-                        color: Color(0xFF8A2D25),
-                        fontSize: 7,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 2.1,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 5),
-            Expanded(
-              child: Scrollbar(
-                controller: controller,
-                thumbVisibility: true,
-                interactive: true,
-                child: ListView.separated(
-                  key: const ValueKey('taste-ledger-list'),
-                  controller: controller,
-                  padding: const EdgeInsets.only(right: 7),
-                  itemCount: tasteOfJapanMemories.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 3),
-                  itemBuilder: (context, index) {
-                    final memory = tasteOfJapanMemories[index];
-                    final selected = index == selectedIndex;
-                    return Semantics(
-                      selected: selected,
-                      button: true,
-                      label: 'Open ${memory.place}, ${memory.dish}',
-                      child: Material(
-                        color: selected
-                            ? const Color(0x44D5B77B)
-                            : const Color(0x00FFFFFF),
-                        shape: RoundedRectangleBorder(
-                          side: BorderSide(
-                            color: selected
-                                ? const Color(0xFF9B7642)
-                                : const Color(0x554A4035),
-                          ),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          key: ValueKey('taste-ledger-item-$index'),
-                          onTap: () => onSelected(index),
-                          child: SizedBox(
-                            height: 58,
-                            child: Row(
-                              children: <Widget>[
-                                SizedBox(
-                                  width: 92,
-                                  height: double.infinity,
-                                  child: Image.asset(
-                                    memory.assetPath,
-                                    fit: BoxFit.cover,
-                                    filterQuality: FilterQuality.medium,
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 2,
-                                    ),
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: <Widget>[
-                                        Text(
-                                          (index + 1).toString().padLeft(
-                                            2,
-                                            '0',
-                                          ),
-                                          style: TextStyle(
-                                            fontFamily: 'Georgia',
-                                            color: const Color(0xFF8A2D25),
-                                            fontSize: 7.5,
-                                            fontWeight: FontWeight.w700,
-                                            letterSpacing: 1.2,
-                                            decoration: TextDecoration.none,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          memory.place.toUpperCase(),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontFamily: 'Georgia',
-                                            color: const Color(0xFF2A2520),
-                                            fontSize: 16.5,
-                                            height: 0.96,
-                                            letterSpacing: 0.5,
-                                            decoration: TextDecoration.none,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          memory.city.toUpperCase(),
-                                          maxLines: 1,
-                                          style: TextStyle(
-                                            fontFamily: 'Georgia',
-                                            color: const Color(0xFF755B3D),
-                                            fontSize: 6.5,
-                                            fontWeight: FontWeight.w700,
-                                            letterSpacing: 1,
-                                            decoration: TextDecoration.none,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                if (selected)
-                                  Container(
-                                    width: 16,
-                                    color: const Color(0xFF681E1A),
-                                    alignment: Alignment.center,
-                                    child: const Icon(
-                                      Icons.diamond_outlined,
-                                      size: 10,
-                                      color: Color(0xFFD2A75D),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Kept for compatibility with older menu experiments that may be revived.
-// ignore: unused_element
 class _TasteLedger extends StatelessWidget {
   const _TasteLedger({
     required this.controller,
+    required this.memories,
     required this.selectedIndex,
     required this.onSelected,
   });
 
   final ScrollController controller;
+  final List<TasteMemory> memories;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
 
@@ -1098,20 +717,22 @@ class _TasteLedger extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: <Widget>[
-              const Text(
-                'THE LEDGER',
-                style: TextStyle(
-                  fontFamily: 'Georgia',
-                  color: EverAfterColors.ink,
-                  fontSize: 23,
-                  height: 1,
-                  letterSpacing: 1.2,
-                  decoration: TextDecoration.none,
+              const Expanded(
+                child: Text(
+                  'THE LEDGER',
+                  style: TextStyle(
+                    fontFamily: 'Georgia',
+                    color: EverAfterColors.ink,
+                    fontSize: 23,
+                    height: 1,
+                    letterSpacing: 1.2,
+                    decoration: TextDecoration.none,
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 12),
               Text(
-                '${tasteOfJapanMemories.length} MEMORIES',
+                '${memories.length} MEMORIES',
                 style: textTheme.labelSmall?.copyWith(fontSize: 7.5),
               ),
             ],
@@ -1131,14 +752,14 @@ class _TasteLedger extends StatelessWidget {
                 key: const ValueKey('taste-ledger-list'),
                 controller: controller,
                 padding: const EdgeInsets.only(right: 11),
-                itemCount: tasteOfJapanMemories.length,
+                itemCount: memories.length,
                 separatorBuilder: (context, index) => Divider(
                   height: 1,
                   thickness: 1,
                   color: EverAfterColors.ink.withValues(alpha: 0.19),
                 ),
                 itemBuilder: (context, index) => _TasteLedgerRow(
-                  memory: tasteOfJapanMemories[index],
+                  memory: memories[index],
                   index: index,
                   selected: index == selectedIndex,
                   onTap: () => onSelected(index),

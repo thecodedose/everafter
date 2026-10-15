@@ -2,41 +2,22 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:everafter/data/bali_boundary.dart';
-import 'package:everafter/data/china_boundary.dart';
 import 'package:everafter/data/gallery_layout.dart';
 import 'package:everafter/data/gallery_memory_content.dart';
-import 'package:everafter/data/hong_kong_boundary.dart';
-import 'package:everafter/data/japan_boundary.dart';
-import 'package:everafter/data/japan_instagram_posts.dart';
-import 'package:everafter/data/japan_memory_collection.dart';
-import 'package:everafter/data/malaysia_boundary.dart';
-import 'package:everafter/data/philippines_boundary.dart';
-import 'package:everafter/data/south_korea_boundary.dart';
-import 'package:everafter/data/taiwan_boundary.dart';
-import 'package:everafter/data/thailand_boundary.dart';
-import 'package:everafter/data/turkey_boundary.dart';
-import 'package:everafter/data/sri_lanka_boundary.dart';
-import 'package:everafter/data/vietnam_boundary.dart';
 import 'package:everafter/theme/everafter_theme.dart';
-import 'package:everafter/util/runtime_environment.dart';
-import 'package:everafter/widgets/ambient_soundtrack.dart';
 import 'package:everafter/widgets/gallery_trinket_image.dart';
 import 'package:everafter/widgets/memory_video_surface_stub.dart'
     if (dart.library.js_interop) 'package:everafter/widgets/memory_video_surface_web.dart';
 import 'package:everafter/widgets/museum_widgets.dart';
-import 'package:everafter/widgets/trip_gallery.dart';
+import 'package:everafter/data/trip_catalog.dart';
+import 'package:everafter/models/gallery_media.dart';
 import 'package:flutter/material.dart';
-import 'package:media_kit/media_kit.dart';
-import 'package:media_kit_video/media_kit_video.dart';
 
 const double _spotlightStartProgress = 0.58;
 const double _instagramReelAspectRatio = 9 / 16;
-const double _galleryViewportCenterX = 640;
-const BoxFit memoryVideoSurfaceFit = BoxFit.fill;
 
 double _galleryEditorialTitleLeft(TripGalleryItem trip) =>
-    trip.slug == 'japan' ? 4348 : 3070;
+    galleryEditorialTitleLeft;
 
 bool galleryAutoplaysVideosFor(TripGalleryItem _) => false;
 
@@ -46,15 +27,9 @@ bool memoryMediaUsesColorTreatment({
 }) => !(isVideo && isPlaying);
 
 class TripJourney extends StatefulWidget {
-  const TripJourney({
-    required this.trip,
-    required this.animation,
-    required this.onTasteTap,
-    super.key,
-  });
+  const TripJourney({required this.trip, required this.onTasteTap, super.key});
 
   final TripGalleryItem trip;
-  final Animation<double> animation;
   final Future<void> Function() onTasteTap;
 
   @override
@@ -83,7 +58,8 @@ class TripJourneyState extends State<TripJourney>
   bool _isGalleryDragging = false;
   double _galleryDragOffset = 0;
   bool _didPrecacheSpotlight = false;
-  bool _didPlaySpotlightSound = false;
+  double _wallScale = 1;
+  bool _videoMuted = true;
 
   @override
   void initState() {
@@ -91,13 +67,13 @@ class TripJourneyState extends State<TripJourney>
     _galleryDriftController = AnimationController(
       vsync: this,
       duration: _BaroqueGalleryWall.driftDurationFor(widget.trip),
-      value: _BaroqueGalleryWall.initialDriftValueFor(widget.trip),
+      value: 0,
     )..repeat();
     _focusController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1250),
       reverseDuration: const Duration(milliseconds: 700),
-    )..addListener(_playSoundWhenSpotlightTurnsOn);
+    );
     _startSlideshowTimer();
   }
 
@@ -109,7 +85,7 @@ class TripJourneyState extends State<TripJourney>
     }
     _galleryDriftController
       ..duration = _BaroqueGalleryWall.driftDurationFor(widget.trip)
-      ..value = _BaroqueGalleryWall.initialDriftValueFor(widget.trip);
+      ..value = 0;
     if (_focusedMemory == null && !_isGalleryDragging) {
       _galleryDriftController.repeat();
     }
@@ -133,19 +109,6 @@ class TripJourneyState extends State<TripJourney>
         });
       }
     });
-  }
-
-  void _playSoundWhenSpotlightTurnsOn() {
-    if (_didPlaySpotlightSound ||
-        _focusedMemory == null ||
-        _focusController.status != AnimationStatus.forward ||
-        _focusCurve.transform(_focusController.value) <
-            _spotlightStartProgress) {
-      return;
-    }
-
-    _didPlaySpotlightSound = true;
-    EverAfterSoundEffects.play(context, EverAfterSoundEffect.frameSelect);
   }
 
   @override
@@ -178,6 +141,7 @@ class TripJourneyState extends State<TripJourney>
 
   void _resetFocusedMediaZoom() {
     _focusedMediaTransformationController.value = Matrix4.identity();
+    _videoMuted = true;
   }
 
   void _focusMemory(_FocusedMemory memory, Rect globalFrameRect) {
@@ -198,7 +162,6 @@ class TripJourneyState extends State<TripJourney>
       _focusedLastAdvanceTick = _slideshowTick;
       _focusedMemorySourceRect = localFrameRect;
       _isDismissingMemory = false;
-      _didPlaySpotlightSound = false;
     });
     _focusController.forward(from: 0);
   }
@@ -265,7 +228,7 @@ class TripJourneyState extends State<TripJourney>
   void _updateGalleryDrag(DragUpdateDetails details) {
     setState(() {
       _galleryDragOffset =
-          (_galleryDragOffset - details.delta.dx) %
+          (_galleryDragOffset - details.delta.dx / _wallScale) %
           _BaroqueGalleryWall.stripWidthFor(widget.trip);
     });
   }
@@ -285,106 +248,60 @@ class TripJourneyState extends State<TripJourney>
     return LayoutBuilder(
       builder: (context, constraints) {
         final viewport = constraints.biggest;
+        _wallScale = viewport.height / 800;
+        final sceneWidth = viewport.width / _wallScale;
         return AnimatedBuilder(
           animation: Listenable.merge(<Listenable>[
-            widget.animation,
             _focusController,
             GalleryLayoutStore.instance,
           ]),
           builder: (context, child) {
-            final layout = GalleryLayoutStore.instance.layoutFor(
-              widget.trip.slug,
-            );
-            final dateRangeLabel = layout.effectiveDateRangeLabel(
-              widget.trip.dateRangeLabel,
-            );
-            final progress = widget.animation.value;
-            final galleryOpacity = _interval(
-              progress,
-              begin: 0.74,
-              end: 0.91,
-              curve: Curves.easeOutCubic,
-            );
-            final globeOpacity = _globeOpacity(progress);
-            final labelOpacity = _labelOpacity(progress);
-            final globeOffset = _globeVerticalOffset(progress);
             final focusProgress =
                 _focusController.status == AnimationStatus.reverse
                 ? Curves.easeInCubic.transform(_focusController.value)
                 : _focusCurve.transform(_focusController.value);
             final focusGeometry = _focusGeometry(viewport, focusProgress);
-
             return Stack(
               key: _journeySurfaceKey,
               fit: StackFit.expand,
               children: <Widget>[
                 const ColoredBox(color: Color(0xFF171716)),
                 if (_focusedMemory == null)
-                  IgnorePointer(
-                    ignoring: galleryOpacity < 0.98,
-                    child: Opacity(
-                      key: const ValueKey('trip-memory-gallery-opacity'),
-                      opacity: galleryOpacity,
+                  MouseRegion(
+                    cursor: _isGalleryDragging
+                        ? SystemMouseCursors.grabbing
+                        : SystemMouseCursors.grab,
+                    child: GestureDetector(
+                      key: const ValueKey('trip-memory-gallery-drag-area'),
+                      behavior: HitTestBehavior.opaque,
+                      onHorizontalDragStart: _startGalleryDrag,
+                      onHorizontalDragUpdate: _updateGalleryDrag,
+                      onHorizontalDragEnd: (_) => _finishGalleryDrag(),
+                      onHorizontalDragCancel: _finishGalleryDrag,
                       child: ClipRect(
-                        child: Transform.translate(
-                          key: const ValueKey(
-                            'focused-gallery-camera-translation',
-                          ),
-                          offset: focusGeometry.translation,
-                          child: Transform.scale(
-                            key: const ValueKey('focused-gallery-camera-scale'),
+                        child: SizedBox.expand(
+                          child: FittedBox(
+                            fit: BoxFit.fill,
                             alignment: Alignment.topLeft,
-                            scale: focusGeometry.scale,
-                            child: Transform.scale(
-                              scale: 1.018 - galleryOpacity * 0.018,
-                              child: MouseRegion(
-                                cursor: _isGalleryDragging
-                                    ? SystemMouseCursors.grabbing
-                                    : SystemMouseCursors.grab,
-                                child: GestureDetector(
-                                  key: const ValueKey(
-                                    'trip-memory-gallery-drag-area',
-                                  ),
-                                  behavior: HitTestBehavior.opaque,
-                                  onHorizontalDragStart: _startGalleryDrag,
-                                  onHorizontalDragUpdate: _updateGalleryDrag,
-                                  onHorizontalDragEnd: (_) =>
-                                      _finishGalleryDrag(),
-                                  onHorizontalDragCancel: _finishGalleryDrag,
-                                  child: _BaroqueGalleryWall(
-                                    key: const ValueKey('trip-memory-gallery'),
-                                    trip: widget.trip,
-                                    drift: _galleryDriftController,
-                                    dragOffset: _galleryDragOffset,
-                                    slideshowTick: _slideshowTick,
-                                    autoplayVideos:
-                                        galleryAutoplaysVideosFor(
-                                          widget.trip,
-                                        ) &&
-                                        _focusedMemory == null &&
-                                        !isFlutterTest,
-                                    onMemoryTap: _focusMemory,
-                                    onTasteTap: widget.onTasteTap,
-                                  ),
+                            child: SizedBox(
+                              width: sceneWidth,
+                              height: 800,
+                              child: _BaroqueGalleryWall(
+                                key: const ValueKey('trip-memory-gallery'),
+                                trip: widget.trip,
+                                viewportWidth: sceneWidth,
+                                drift: _galleryDriftController,
+                                dragOffset: _galleryDragOffset,
+                                slideshowTick: _slideshowTick,
+                                autoplayVideos: galleryAutoplaysVideosFor(
+                                  widget.trip,
                                 ),
+                                onMemoryTap: _focusMemory,
+                                onTasteTap: widget.onTasteTap,
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                  ),
-                if (progress < 0.86)
-                  Opacity(
-                    opacity: globeOpacity,
-                    child: Transform.translate(
-                      offset: Offset(0, globeOffset * 690),
-                      child: _DestinationGlobeScene(
-                        key: const ValueKey('trip-globe-scene'),
-                        trip: widget.trip,
-                        dateRangeLabel: dateRangeLabel,
-                        journeyProgress: progress,
-                        labelOpacity: labelOpacity,
                       ),
                     ),
                   ),
@@ -400,6 +317,9 @@ class TripJourneyState extends State<TripJourney>
                     spotlightAsset: _spotlightAsset,
                     transformationController:
                         _focusedMediaTransformationController,
+                    videoMuted: _videoMuted,
+                    onToggleVideoSound: () =>
+                        setState(() => _videoMuted = !_videoMuted),
                     onPreviousRequested: _retreatFocusedMemory,
                     onNextRequested: _advanceFocusedMemory,
                     onDismissRequested: _dismissFocusedMemory,
@@ -423,10 +343,18 @@ class TripJourneyState extends State<TripJourney>
       );
     }
 
-    final targetScale = viewport.height * 0.9 / sourceRect.height;
+    final compact = viewport.width < 600;
+    final targetScale = math.min(
+      viewport.width * 0.92 / sourceRect.width,
+      viewport.height * (compact ? 0.65 : 0.9) / sourceRect.height,
+    );
+    final targetCenter = Offset(
+      viewport.width / 2,
+      viewport.height * (compact ? 0.42 : 0.5),
+    );
     final scale = 1 + (targetScale - 1) * progress;
-    final targetTranslation =
-        viewport.center(Offset.zero) - sourceRect.center * targetScale;
+    final targetTranslation = targetCenter - sourceRect.center * targetScale;
+
     final translation = targetTranslation * progress;
     final frameRect = Rect.fromLTWH(
       sourceRect.left * scale + translation.dx,
@@ -454,472 +382,10 @@ class _FocusGeometry {
   final Rect frameRect;
 }
 
-class _DestinationGlobeScene extends StatelessWidget {
-  const _DestinationGlobeScene({
-    required this.trip,
-    required this.dateRangeLabel,
-    required this.journeyProgress,
-    required this.labelOpacity,
-    super.key,
-  });
-
-  final TripGalleryItem trip;
-  final String dateRangeLabel;
-  final double journeyProgress;
-  final double labelOpacity;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: <Widget>[
-        Positioned.fill(
-          child: Opacity(
-            opacity: 0.11,
-            child: Image.asset(
-              'assets/textures/warm_linen_canvas_visible.jpg',
-              fit: BoxFit.cover,
-              color: const Color(0xFF1B1B19),
-              colorBlendMode: BlendMode.multiply,
-            ),
-          ),
-        ),
-        Positioned(
-          left: 128,
-          top: 288,
-          width: 1024,
-          height: 1024,
-          child: IgnorePointer(
-            child: DecoratedBox(
-              key: const ValueKey('destination-globe-atmosphere'),
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: <BoxShadow>[
-                  BoxShadow(
-                    color: Color(0x669EC8D1),
-                    blurRadius: 68,
-                    spreadRadius: 7,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          left: 128,
-          top: 288,
-          width: 1024,
-          height: 512,
-          child: ClipRect(
-            key: const ValueKey('destination-globe-upper-hemisphere'),
-            child: OverflowBox(
-              alignment: Alignment.topCenter,
-              minWidth: 1024,
-              maxWidth: 1024,
-              minHeight: 1024,
-              maxHeight: 1024,
-              child: IgnorePointer(
-                child: _RasterRotatingGlobe(
-                  trip: trip,
-                  journeyProgress: journeyProgress,
-                ),
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          left: 120,
-          right: 120,
-          top: 64,
-          child: Opacity(
-            opacity: labelOpacity,
-            child: Column(
-              children: <Widget>[
-                Text(
-                  'DESTINATION',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: EverAfterColors.brass,
-                    fontSize: 11,
-                    letterSpacing: 3.2,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    trip.name.toUpperCase(),
-                    key: const ValueKey('trip-globe-destination'),
-                    style: const TextStyle(
-                      fontFamily: 'Georgia',
-                      color: EverAfterColors.paper,
-                      fontSize: 58,
-                      height: 1,
-                      letterSpacing: 5.6,
-                      decoration: TextDecoration.none,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  dateRangeLabel,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: EverAfterColors.agedPaper.withValues(alpha: 0.78),
-                    letterSpacing: 2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RasterRotatingGlobe extends StatelessWidget {
-  const _RasterRotatingGlobe({
-    required this.trip,
-    required this.journeyProgress,
-  });
-
-  static const _frameCount = 32;
-  static const _columns = 8;
-  static const _rows = 4;
-  static const _globeSize = 1024.0;
-  static const _rotationFrames = 48;
-  static const _destinationFrame = 28;
-  static const _destinationCameraOffset = 30.0;
-
-  final TripGalleryItem trip;
-  final double journeyProgress;
-
-  @override
-  Widget build(BuildContext context) {
-    final framePosition = rotatingGlobeFramePositionFor(trip, journeyProgress);
-    final frame = framePosition.floor() % _frameCount;
-    final nextFrame = (frame + 1) % _frameCount;
-    final frameBlend = framePosition - framePosition.floor();
-    final markerOpacity = _interval(
-      journeyProgress,
-      begin: 0.28,
-      end: 0.38,
-      curve: Curves.easeOutCubic,
-    );
-    final glowPulse =
-        0.78 +
-        math
-                .sin(
-                  _interval(journeyProgress, begin: 0.28, end: 0.72) *
-                      math.pi *
-                      5,
-                )
-                .abs() *
-            0.22;
-    return Semantics(
-      image: true,
-      label: 'Earth focused on ${trip.name}',
-      child: RepaintBoundary(
-        key: const ValueKey('destination-globe-raster'),
-        child: Stack(
-          fit: StackFit.expand,
-          clipBehavior: Clip.none,
-          children: <Widget>[
-            ClipOval(
-              child: Stack(
-                clipBehavior: Clip.hardEdge,
-                children: <Widget>[
-                  _globeSpriteFrame(
-                    key: ValueKey('destination-globe-frame-$frame'),
-                    assetPath: destinationGlobeAssetFor(trip),
-                    frame: frame,
-                  ),
-                  if (frameBlend > 0.001)
-                    _globeSpriteFrame(
-                      key: ValueKey('destination-globe-frame-blend-$nextFrame'),
-                      assetPath: destinationGlobeAssetFor(trip),
-                      frame: nextFrame,
-                      opacity: frameBlend,
-                    ),
-                ],
-              ),
-            ),
-            Positioned.fill(
-              key: const ValueKey('destination-area-outline-position'),
-              child: Opacity(
-                opacity: markerOpacity,
-                child: Semantics(
-                  image: true,
-                  label: '${trip.name} destination area outlined and glowing',
-                  child: CustomPaint(
-                    key: const ValueKey('destination-area-outline'),
-                    painter: _ProjectedDestinationOutlinePainter(
-                      trip: trip,
-                      frame: framePosition,
-                      glow: glowPulse,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-Widget _globeSpriteFrame({
-  required String assetPath,
-  required int frame,
-  required Key key,
-  double opacity = 1,
-}) {
-  final column = frame % _RasterRotatingGlobe._columns;
-  final row = frame ~/ _RasterRotatingGlobe._columns;
-  return Positioned(
-    key: key,
-    left: -column * _RasterRotatingGlobe._globeSize,
-    top: -row * _RasterRotatingGlobe._globeSize,
-    width: _RasterRotatingGlobe._globeSize * _RasterRotatingGlobe._columns,
-    height: _RasterRotatingGlobe._globeSize * _RasterRotatingGlobe._rows,
-    child: Opacity(
-      opacity: opacity,
-      child: Image.asset(
-        assetPath,
-        fit: BoxFit.fill,
-        filterQuality: FilterQuality.medium,
-        excludeFromSemantics: true,
-      ),
-    ),
-  );
-}
-
-int rotatingGlobeFrameFor(TripGalleryItem trip, double journeyProgress) {
-  return rotatingGlobeFramePositionFor(trip, journeyProgress).round() %
-      _RasterRotatingGlobe._frameCount;
-}
-
-double rotatingGlobeFramePositionFor(
-  TripGalleryItem trip,
-  double journeyProgress,
-) {
-  final rotationProgress = _interval(
-    journeyProgress,
-    begin: 0,
-    end: 0.34,
-    curve: Curves.easeOutCubic,
-  );
-  final framePosition =
-      _RasterRotatingGlobe._destinationFrame -
-      _RasterRotatingGlobe._rotationFrames +
-      _RasterRotatingGlobe._rotationFrames * rotationProgress;
-  return framePosition % _RasterRotatingGlobe._frameCount;
-}
-
-Offset destinationGlobePointFor(TripGalleryItem trip, int frame) {
-  return _projectGlobeCoordinate(
-        latitude: trip.latitude,
-        longitude: trip.longitude,
-        frame: frame,
-        size: const Size.square(_RasterRotatingGlobe._globeSize),
-        latitudeAtCenter: _cameraLatitudeForTrip(trip),
-        longitudePhase: _longitudePhaseForTrip(trip),
-      ) ??
-      const Offset(_RasterRotatingGlobe._globeSize / 2, 0);
-}
-
-String destinationGlobeAssetFor(TripGalleryItem trip) {
-  return 'assets/images/experience/'
-      'earth-globe-${trip.slug}-centered-rotation-sheet.jpg';
-}
-
-double _cameraLatitudeForTrip(TripGalleryItem trip) {
-  return trip.latitude - _RasterRotatingGlobe._destinationCameraOffset;
-}
-
-double _longitudePhaseForTrip(TripGalleryItem trip) {
-  const destinationFrameCenter =
-      -180 +
-      _RasterRotatingGlobe._destinationFrame *
-          (360 / _RasterRotatingGlobe._frameCount);
-  return trip.longitude - destinationFrameCenter;
-}
-
-Offset? _projectGlobeCoordinate({
-  required double latitude,
-  required double longitude,
-  required num frame,
-  required Size size,
-  double latitudeAtCenter = 28,
-  double longitudePhase = 0,
-}) {
-  final centerLongitude =
-      -180 + longitudePhase + frame * (360 / _RasterRotatingGlobe._frameCount);
-  final latitudeRadians = latitude * math.pi / 180;
-  final longitudeDelta = (longitude - centerLongitude) * math.pi / 180;
-  final centerLatitude = latitudeAtCenter * math.pi / 180;
-  final visibility =
-      math.sin(centerLatitude) * math.sin(latitudeRadians) +
-      math.cos(centerLatitude) *
-          math.cos(latitudeRadians) *
-          math.cos(longitudeDelta);
-  if (visibility <= 0) {
-    return null;
-  }
-  final x = math.cos(latitudeRadians) * math.sin(longitudeDelta);
-  final y =
-      math.cos(centerLatitude) * math.sin(latitudeRadians) -
-      math.sin(centerLatitude) *
-          math.cos(latitudeRadians) *
-          math.cos(longitudeDelta);
-  return Offset((x + 1) * size.width / 2, (1 - y) * size.height / 2);
-}
-
-class _ProjectedDestinationOutlinePainter extends CustomPainter {
-  const _ProjectedDestinationOutlinePainter({
-    required this.trip,
-    required this.frame,
-    required this.glow,
-  });
-
-  final TripGalleryItem trip;
-  final double frame;
-  final double glow;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = projectedDestinationBoundaryPathForFrame(trip, frame, size);
-    _paintDestinationOutline(canvas, path, glow);
-  }
-
-  @override
-  bool shouldRepaint(_ProjectedDestinationOutlinePainter oldDelegate) {
-    return oldDelegate.trip.slug != trip.slug ||
-        oldDelegate.frame != frame ||
-        oldDelegate.glow != glow;
-  }
-}
-
-Path projectedJapanBoundaryPathForFrame(int frame, Size size) {
-  final japan = tripGalleryItems.first;
-  return projectedDestinationBoundaryPathForFrame(japan, frame, size);
-}
-
-Path projectedChinaBoundaryPathForFrame(int frame, Size size) {
-  final china = tripGalleryItems.firstWhere((trip) => trip.slug == 'china');
-  return projectedDestinationBoundaryPathForFrame(china, frame, size);
-}
-
-Path projectedDestinationBoundaryPathForFrame(
-  TripGalleryItem trip,
-  num frame,
-  Size size,
-) {
-  return _projectBoundaryRings(
-    rings: destinationBoundaryRingsFor(trip),
-    trip: trip,
-    frame: frame.toDouble(),
-    size: size,
-  );
-}
-
-List<List<Offset>> destinationBoundaryRingsFor(TripGalleryItem trip) {
-  return switch (trip.slug) {
-    'japan' => japanBoundaryRings,
-    'south-korea' => southKoreaBoundaryRings,
-    'china' => chinaBoundaryRings,
-    'philippines' => philippinesBoundaryRings,
-    'turkey' => turkeyBoundaryRings,
-    'taiwan' => taiwanBoundaryRings,
-    'hong-kong' => hongKongBoundaryRings,
-    'thailand' => thailandBoundaryRings,
-    'malaysia' => malaysiaBoundaryRings,
-    'bali' => baliBoundaryRings,
-    'vietnam' => vietnamBoundaryRings,
-    'sri-lanka' => sriLankaBoundaryRings,
-    _ => throw ArgumentError.value(trip.slug, 'trip', 'Missing boundary data'),
-  };
-}
-
-Path _projectBoundaryRings({
-  required List<List<Offset>> rings,
-  required TripGalleryItem trip,
-  required double frame,
-  required Size size,
-}) {
-  final path = Path()..fillType = PathFillType.evenOdd;
-  for (final ring in rings) {
-    var drawing = false;
-    var visiblePoints = 0;
-    for (final coordinate in ring) {
-      final point = _projectGlobeCoordinate(
-        latitude: coordinate.dy,
-        longitude: coordinate.dx,
-        frame: frame,
-        size: size,
-        latitudeAtCenter: _cameraLatitudeForTrip(trip),
-        longitudePhase: _longitudePhaseForTrip(trip),
-      );
-      if (point == null) {
-        drawing = false;
-        continue;
-      }
-      if (!drawing) {
-        path.moveTo(point.dx, point.dy);
-        drawing = true;
-      } else {
-        path.lineTo(point.dx, point.dy);
-      }
-      visiblePoints += 1;
-    }
-    if (drawing && visiblePoints == ring.length) {
-      path.close();
-    }
-  }
-  return path;
-}
-
-void _paintDestinationOutline(Canvas canvas, Path path, double glow) {
-  canvas.drawPath(
-    path,
-    Paint()
-      ..style = PaintingStyle.fill
-      ..color = EverAfterColors.brass.withValues(alpha: 0.18 * glow)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
-  );
-  canvas.drawPath(
-    path,
-    Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 9
-      ..strokeJoin = StrokeJoin.round
-      ..strokeCap = StrokeCap.round
-      ..color = const Color(0xFFDBB96B).withValues(alpha: 0.42 * glow)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
-  );
-  canvas.drawPath(
-    path,
-    Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.2
-      ..strokeJoin = StrokeJoin.round
-      ..strokeCap = StrokeCap.round
-      ..color = const Color(0xFFF4D98D).withValues(alpha: 0.72 * glow),
-  );
-  canvas.drawPath(
-    path,
-    Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.15
-      ..strokeJoin = StrokeJoin.round
-      ..strokeCap = StrokeCap.round
-      ..color = const Color(0xFFFFF4C8),
-  );
-}
-
 class _BaroqueGalleryWall extends StatelessWidget {
   const _BaroqueGalleryWall({
     required this.trip,
+    required this.viewportWidth,
     required this.drift,
     required this.dragOffset,
     required this.slideshowTick,
@@ -938,16 +404,19 @@ class _BaroqueGalleryWall extends StatelessWidget {
     milliseconds: (stripWidthFor(trip) / _driftPixelsPerSecond * 1000).round(),
   );
 
-  static double initialDriftValueFor(TripGalleryItem trip) {
+  static double initialDriftValueFor(
+    TripGalleryItem trip, {
+    required double viewportWidth,
+  }) {
     const titleWidth = 340.0;
     final layout = GalleryLayoutStore.instance.layoutFor(trip.slug);
     final titleCenter =
         _galleryEditorialTitleLeft(trip) - layout.leadingTrim + titleWidth / 2;
-    final initialPhase = titleCenter - _galleryViewportCenterX;
-    return initialPhase / stripWidthFor(trip);
+    return (titleCenter - viewportWidth / 2) / stripWidthFor(trip);
   }
 
   final TripGalleryItem trip;
+  final double viewportWidth;
   final Animation<double> drift;
   final double dragOffset;
   final int slideshowTick;
@@ -958,7 +427,7 @@ class _BaroqueGalleryWall extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stripWidth = stripWidthFor(trip);
-    final wallpaperTileWidth = trip.slug == 'japan' ? 575.0 : 600.0;
+    const wallpaperTileWidth = 575.0;
     final wallpaperScale = 675 / wallpaperTileWidth;
     return RepaintBoundary(
       child: Stack(
@@ -974,7 +443,14 @@ class _BaroqueGalleryWall extends StatelessWidget {
               animation: drift,
               builder: (context, child) {
                 final scrollPhase =
-                    (drift.value * stripWidth + dragOffset) % stripWidth;
+                    (drift.value * stripWidth +
+                        dragOffset +
+                        initialDriftValueFor(
+                              trip,
+                              viewportWidth: viewportWidth,
+                            ) *
+                            stripWidth) %
+                    stripWidth;
                 return Transform.translate(
                   key: const ValueKey('gallery-drift-transform'),
                   offset: Offset(-scrollPhase, 0),
@@ -1153,7 +629,9 @@ class _GalleryStrip extends StatelessWidget {
       width: width,
       height: height,
       child: _OrganicGalleryKeepsake(
-        key: ValueKey<String>('south-korea-keepsake-$keepsakeName-$copyIndex'),
+        key: ValueKey<String>(
+          'gallery-keepsake-${trip.slug}-$keepsakeName-$copyIndex',
+        ),
         assetName: assetName,
         label: label,
         angle: angle,
@@ -1162,7 +640,8 @@ class _GalleryStrip extends StatelessWidget {
   }
 
   Widget _instagramPost(GalleryInstagramPlacement placement) {
-    final post = japanInstagramPosts[placement.postIndex];
+    final post = galleryVideoPostFor(trip.slug, placement.postIndex);
+    if (post == null) return const SizedBox.shrink();
     final scaledWidth = placement.width * placement.scale;
     final scaledHeight = placement.height * placement.scale;
     final frameKind = switch (placement.style) {
@@ -1180,8 +659,9 @@ class _GalleryStrip extends StatelessWidget {
       child: Transform.rotate(
         angle: 0,
         child: _TappableInstagramPostFrame(
+          tripName: trip.name,
           key: ValueKey<String>(
-            'japan-instagram-post-${post.shortcode}-$copyIndex',
+            'gallery-video-post-${trip.slug}-${post.shortcode}-$copyIndex',
           ),
           post: post,
           postNumber: placement.postIndex + 1,
@@ -1235,11 +715,11 @@ class _GalleryStrip extends StatelessWidget {
     final memoryLocation = galleryMemoryLocationFor(trip.slug, memoryIndex);
     final media = photoEdits.isEmpty
         ? defaultGalleryMediaFor(trip, memoryIndex, portrait: portrait)
-        : <JapanMemoryAsset>[
+        : <GalleryMemoryAsset>[
             for (final edit in photoEdits)
-              JapanMemoryAsset(
+              GalleryMemoryAsset(
                 assetPath: edit.assetPath,
-                kind: JapanMemoryKind.photo,
+                kind: GalleryMemoryKind.photo,
                 alignmentX: edit.alignmentX,
                 alignmentY: edit.alignmentY,
                 zoom: edit.zoom,
@@ -1405,10 +885,10 @@ class _TripTasteGalleryMenuState extends State<_TripTasteGalleryMenu>
     if (menuBox == null || overlayBox == null || !menuBox.hasSize) {
       return null;
     }
-    final topLeft = overlayBox.globalToLocal(
-      menuBox.localToGlobal(Offset.zero),
+    return MatrixUtils.transformRect(
+      menuBox.getTransformTo(overlayBox),
+      Offset.zero & menuBox.size,
     );
-    return topLeft & menuBox.size;
   }
 
   void _showPageOverlay({required bool expanded}) {
@@ -1839,9 +1319,7 @@ class _TasteLaceMenuCover extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          trip.name == 'Japan'
-                              ? '味'
-                              : trip.name.substring(0, 1).toUpperCase(),
+                          trip.location.substring(0, 1).toUpperCase(),
                           style: const TextStyle(
                             color: Color(0xFFF4E6CB),
                             fontSize: 16,
@@ -2026,14 +1504,14 @@ class _FocusedMemory {
 
   final String id;
   final _FrameKind kind;
-  final List<JapanMemoryAsset> media;
+  final List<GalleryMemoryAsset> media;
   final Alignment alignment;
   final String semanticsLabel;
   final String? locationLabel;
   final int slideshowOffset;
   final int slideshowPeriod;
   final int slideshowPhase;
-  final JapanInstagramPost? instagramPost;
+  final GalleryVideoPost? instagramPost;
 }
 
 int _scheduledSlideshowIndex(_FocusedMemory memory, int tick) {
@@ -2071,7 +1549,10 @@ class _TappableMemoryFrameState extends State<_TappableMemoryFrame> {
     if (frameBox == null) {
       return;
     }
-    final frameRect = frameBox.localToGlobal(Offset.zero) & frameBox.size;
+    final frameRect = MatrixUtils.transformRect(
+      frameBox.getTransformTo(null),
+      Offset.zero & frameBox.size,
+    );
     widget.onTap(widget.memory, frameRect);
   }
 
@@ -2112,6 +1593,7 @@ class _TappableMemoryFrameState extends State<_TappableMemoryFrame> {
 class _TappableInstagramPostFrame extends StatefulWidget {
   const _TappableInstagramPostFrame({
     required this.post,
+    required this.tripName,
     required this.postNumber,
     required this.frameKind,
     required this.autoplayVideo,
@@ -2119,7 +1601,8 @@ class _TappableInstagramPostFrame extends StatefulWidget {
     super.key,
   });
 
-  final JapanInstagramPost post;
+  final GalleryVideoPost post;
+  final String tripName;
   final int postNumber;
   final _FrameKind frameKind;
   final bool autoplayVideo;
@@ -2140,20 +1623,23 @@ class _TappableInstagramPostFrameState
     if (frameBox == null) {
       return;
     }
-    final frameRect = frameBox.localToGlobal(Offset.zero) & frameBox.size;
+    final frameRect = MatrixUtils.transformRect(
+      frameBox.getTransformTo(null),
+      Offset.zero & frameBox.size,
+    );
     widget.onTap(
       _FocusedMemory(
         id: 'instagram-${widget.post.shortcode}',
         kind: widget.frameKind,
-        media: <JapanMemoryAsset>[
-          JapanMemoryAsset(
+        media: <GalleryMemoryAsset>[
+          GalleryMemoryAsset(
             assetPath: widget.post.videoAssetPath,
-            kind: JapanMemoryKind.video,
+            kind: GalleryMemoryKind.video,
             posterAssetPath: widget.post.coverAssetPath,
           ),
         ],
         alignment: Alignment.center,
-        semanticsLabel: 'Instagram reel ${widget.postNumber} from Japan',
+        semanticsLabel: 'Video ${widget.postNumber} from ${widget.tripName}',
         locationLabel: null,
         slideshowOffset: 0,
         slideshowPeriod: 6,
@@ -2177,7 +1663,7 @@ class _TappableInstagramPostFrameState
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'Open Instagram reel ${widget.postNumber} from Japan',
+      label: 'Open video ${widget.postNumber} from ${widget.tripName}',
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: Listener(
@@ -2207,7 +1693,7 @@ class _BaroqueInstagramPostFrame extends StatelessWidget {
     required this.playVideo,
   });
 
-  final JapanInstagramPost post;
+  final GalleryVideoPost post;
   final _FrameKind kind;
   final bool playVideo;
 
@@ -2308,7 +1794,7 @@ class _InstagramPostFrame extends StatelessWidget {
     this.muted = true,
   });
 
-  final JapanInstagramPost post;
+  final GalleryVideoPost post;
   final bool focused;
   final bool playVideo;
   final bool muted;
@@ -2347,11 +1833,13 @@ class _FocusedInstagramPostFrame extends StatelessWidget {
     required this.post,
     required this.progress,
     required this.playVideo,
+    this.muted = true,
   });
 
-  final JapanInstagramPost post;
+  final GalleryVideoPost post;
   final double progress;
   final bool playVideo;
+  final bool muted;
 
   @override
   Widget build(BuildContext context) {
@@ -2376,7 +1864,7 @@ class _FocusedInstagramPostFrame extends StatelessWidget {
               post: post,
               focused: true,
               playVideo: playVideo,
-              muted: false,
+              muted: muted,
             ),
           ),
         );
@@ -2388,6 +1876,8 @@ class _FocusedInstagramPostFrame extends StatelessWidget {
 class _FocusedMemoryOverlay extends StatelessWidget {
   const _FocusedMemoryOverlay({
     required this.memory,
+    required this.videoMuted,
+    required this.onToggleVideoSound,
     required this.sourceRect,
     required this.cameraScale,
     required this.cameraTranslation,
@@ -2402,6 +1892,8 @@ class _FocusedMemoryOverlay extends StatelessWidget {
   });
 
   final _FocusedMemory memory;
+  final bool videoMuted;
+  final VoidCallback onToggleVideoSound;
   final Rect sourceRect;
   final double cameraScale;
   final Offset cameraTranslation;
@@ -2456,18 +1948,20 @@ class _FocusedMemoryOverlay extends StatelessWidget {
         final focusedMedia = memory.instagramPost != null
             ? _FocusedInstagramPostFrame(
                 post: memory.instagramPost!,
+                muted: videoMuted,
                 progress: progress,
-                playVideo: progress >= 0.98 && !isFlutterTest,
+                playVideo: progress >= 0.98,
               )
             : _BaroqueMemoryFrame(
                 kind: memory.kind,
                 media: memory.media,
                 alignment: memory.alignment,
                 semanticsLabel: 'Enlarged ${memory.semanticsLabel}',
+                muted: videoMuted,
                 locationLabel: memory.locationLabel,
                 mediaIndex: slideshowIndex,
                 imageViewportKey: const ValueKey('focused-memory-image'),
-                playVideos: progress >= 0.98 && !isFlutterTest,
+                playVideos: progress >= 0.98,
                 showFrame: false,
               );
         final transitionFrame = memory.instagramPost != null
@@ -2670,7 +2164,7 @@ class _FocusedMemoryOverlay extends StatelessWidget {
             Positioned(
               left: 0,
               right: 0,
-              bottom: 20,
+              bottom: MediaQuery.paddingOf(context).bottom + 20,
               child: IgnorePointer(
                 child: Opacity(
                   opacity: _interval(
@@ -2679,47 +2173,63 @@ class _FocusedMemoryOverlay extends StatelessWidget {
                     end: 1,
                     curve: Curves.easeOut,
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      if (memory.locationLabel != null) ...<Widget>[
-                        Text(
-                          key: const ValueKey(
-                            'focused-memory-slideshow-counter',
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        if (memory.locationLabel != null) ...<Widget>[
+                          Text(
+                            key: const ValueKey(
+                              'focused-memory-slideshow-counter',
+                            ),
+                            '${slideshowIndex + 1}'
+                            ' / ${memory.media.length}',
+                            style: const TextStyle(
+                              fontFamily: 'Georgia',
+                              color: Color(0x99DCCEB7),
+                              fontSize: 8,
+                              letterSpacing: 1.4,
+                              decoration: TextDecoration.none,
+                            ),
                           ),
-                          '${slideshowIndex + 1}'
-                          ' / ${memory.media.length}',
-                          style: const TextStyle(
+                          const SizedBox(height: 8),
+                        ],
+                        Text(
+                          canAdvance
+                              ? 'TAP LEFT / RIGHT FOR PREVIOUS / NEXT'
+                                    '  ·  PINCH TO ZOOM'
+                                    '  ·  TAP OUTSIDE TO RETURN'
+                              : 'TAP OUTSIDE TO RETURN',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
                             fontFamily: 'Georgia',
-                            color: Color(0x99DCCEB7),
-                            fontSize: 8,
-                            letterSpacing: 1.4,
+                            color: Color(0xBFDCCEB7),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 2.4,
                             decoration: TextDecoration.none,
                           ),
                         ),
-                        const SizedBox(height: 8),
                       ],
-                      Text(
-                        canAdvance
-                            ? 'TAP LEFT / RIGHT FOR PREVIOUS / NEXT'
-                                  '  ·  PINCH TO ZOOM'
-                                  '  ·  TAP OUTSIDE TO RETURN'
-                            : 'TAP OUTSIDE TO RETURN',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'Georgia',
-                          color: Color(0xBFDCCEB7),
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 2.4,
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
+            if (progress >= 0.98 &&
+                (memory.instagramPost != null ||
+                    memory.media[slideshowIndex].isVideo))
+              Positioned(
+                top: MediaQuery.paddingOf(context).top + 64,
+                right: 16,
+                child: IconButton.filledTonal(
+                  key: const ValueKey('memory-video-sound'),
+                  tooltip: videoMuted ? 'Turn video sound on' : 'Mute video',
+                  onPressed: onToggleVideoSound,
+                  icon: Icon(videoMuted ? Icons.volume_off : Icons.volume_up),
+                ),
+              ),
           ],
         );
       },
@@ -2731,6 +2241,18 @@ Rect _focusedLocationPlacardRect({
   required Size viewport,
   required Rect frameRect,
 }) {
+  if (viewport.width < 600) {
+    final width = math.min(168.0, viewport.width - 32);
+    final height = width * 0.72;
+    final maxTop = math.max(16.0, viewport.height - height - 80);
+    return Rect.fromLTWH(
+      (viewport.width - width) / 2,
+      (frameRect.bottom + 12).clamp(16.0, maxTop),
+      width,
+      height,
+    );
+  }
+
   final width = (viewport.width * 0.15).clamp(128.0, 168.0);
   final height = width * 0.72;
   final horizontalMargin = (viewport.width * 0.025).clamp(18.0, 32.0);
@@ -2978,10 +2500,11 @@ class _BaroqueMemoryFrame extends StatelessWidget {
     this.playVideos = false,
     this.slideshowId,
     this.showFrame = true,
+    this.muted = true,
   });
 
   final _FrameKind kind;
-  final List<JapanMemoryAsset> media;
+  final List<GalleryMemoryAsset> media;
   final Alignment alignment;
   final String semanticsLabel;
   final String? locationLabel;
@@ -2990,6 +2513,7 @@ class _BaroqueMemoryFrame extends StatelessWidget {
   final bool playVideos;
   final String? slideshowId;
   final bool showFrame;
+  final bool muted;
 
   String get _frameAsset => switch (kind) {
     _FrameKind.oval => 'assets/images/experience/baroque-frame-oval-hd.png',
@@ -3035,6 +2559,7 @@ class _BaroqueMemoryFrame extends StatelessWidget {
             children: <Widget>[
               if (selectedMedia.isVideo && playVideos)
                 _LoopingMemoryVideo(
+                  muted: muted,
                   assetPath: selectedMedia.assetPath,
                   posterAssetPath: selectedMedia.displayAssetPath,
                   alignment: mediaAlignment,
@@ -3252,7 +2777,7 @@ class _VideoMemoryBadge extends StatelessWidget {
   }
 }
 
-class _LoopingMemoryVideo extends StatefulWidget {
+class _LoopingMemoryVideo extends StatelessWidget {
   const _LoopingMemoryVideo({
     required this.assetPath,
     required this.posterAssetPath,
@@ -3266,75 +2791,18 @@ class _LoopingMemoryVideo extends StatefulWidget {
   final bool muted;
 
   @override
-  State<_LoopingMemoryVideo> createState() => _LoopingMemoryVideoState();
-}
-
-class _LoopingMemoryVideoState extends State<_LoopingMemoryVideo> {
-  Player? _player;
-  VideoController? _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    if (usesWebMemoryVideoSurface) {
-      return;
-    }
-    final player = Player(
-      configuration: PlayerConfiguration(
-        muted: widget.muted,
-        bufferSize: 8 * 1024 * 1024,
-      ),
-    );
-    _player = player;
-    _controller = VideoController(player);
-    unawaited(_openVideo());
-  }
-
-  Future<void> _openVideo() async {
-    final player = _player;
-    if (player == null) {
-      return;
-    }
-    await player.setPlaylistMode(PlaylistMode.single);
-    await player.open(Media('asset:///${widget.assetPath}'));
-  }
-
-  @override
-  void dispose() {
-    final player = _player;
-    if (player != null) {
-      unawaited(player.dispose());
-    }
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Stack(
       fit: StackFit.expand,
       children: <Widget>[
         Image.asset(
-          widget.posterAssetPath,
+          posterAssetPath,
           fit: BoxFit.cover,
-          alignment: widget.alignment,
+          alignment: alignment,
           filterQuality: FilterQuality.high,
           excludeFromSemantics: true,
         ),
-        if (usesWebMemoryVideoSurface)
-          WebMemoryVideoSurface(
-            assetPath: widget.assetPath,
-            muted: widget.muted,
-          )
-        else
-          Video(
-            controller: _controller!,
-            fit: memoryVideoSurfaceFit,
-            alignment: widget.alignment,
-            fill: Colors.transparent,
-            controls: NoVideoControls,
-            wakelock: false,
-            filterQuality: FilterQuality.high,
-          ),
+        WebMemoryVideoSurface(assetPath: assetPath, muted: muted),
       ],
     );
   }
@@ -3353,44 +2821,4 @@ double _interval(
     return 1;
   }
   return curve.transform((progress - begin) / (end - begin));
-}
-
-double _globeOpacity(double progress) {
-  if (progress < 0.1) {
-    return _interval(progress, begin: 0, end: 0.1, curve: Curves.easeOutCubic);
-  }
-  if (progress <= 0.72) {
-    return 1;
-  }
-  return 1 -
-      _interval(progress, begin: 0.72, end: 0.83, curve: Curves.easeInCubic);
-}
-
-double _labelOpacity(double progress) {
-  if (progress < 0.14) {
-    return 0;
-  }
-  if (progress < 0.26) {
-    return _interval(
-      progress,
-      begin: 0.14,
-      end: 0.26,
-      curve: Curves.easeOutCubic,
-    );
-  }
-  if (progress <= 0.67) {
-    return 1;
-  }
-  return 1 - _interval(progress, begin: 0.67, end: 0.77);
-}
-
-double _globeVerticalOffset(double progress) {
-  if (progress < 0.21) {
-    return 1 -
-        _interval(progress, begin: 0, end: 0.21, curve: Curves.easeOutCubic);
-  }
-  if (progress <= 0.68) {
-    return 0;
-  }
-  return _interval(progress, begin: 0.68, end: 0.84, curve: Curves.easeInCubic);
 }

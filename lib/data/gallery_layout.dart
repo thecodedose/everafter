@@ -4,13 +4,14 @@ import 'dart:math' as math;
 import 'package:everafter/services/global_gallery_layout_file.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 enum GalleryFrameStyle { oval, circular, portrait, landscape, horizontalOval }
 
 const double horizontalOvalFrameAspectRatio = 25 / 17;
 const double circularFrameAspectRatio = 1;
 const double featuredCircularFrameSize = 220;
+
+const double galleryEditorialTitleLeft = 4348;
 
 @immutable
 class GalleryPhotoEdit {
@@ -607,8 +608,8 @@ class GalleryTripLayout {
       travelEndDate: json['travelEndDate'] as String?,
       layoutVersion: (json['layoutVersion'] as num?)?.toInt() ?? 1,
     );
-    final instagramUpgraded = tripSlug == 'japan' && layout.layoutVersion < 2
-        ? _upgradeJapanInstagramFrameScale(layout)
+    final instagramUpgraded = layout.layoutVersion < 2
+        ? _upgradeVideoPostFrameScale(layout)
         : layout;
     final circularUpgraded = instagramUpgraded.layoutVersion < 3
         ? _upgradeCircularFrameMix(instagramUpgraded)
@@ -619,7 +620,7 @@ class GalleryTripLayout {
   }
 }
 
-GalleryTripLayout _upgradeJapanInstagramFrameScale(GalleryTripLayout layout) {
+GalleryTripLayout _upgradeVideoPostFrameScale(GalleryTripLayout layout) {
   final posts = layout.instagramPosts;
 
   double addedWidth(GalleryInstagramPlacement post) =>
@@ -703,13 +704,13 @@ GalleryTripLayout _upgradeFeaturedCircularFrameSize(GalleryTripLayout layout) {
   final secondCircle = layout.frames
       .where((frame) => frame.id == 'frame-8')
       .firstOrNull;
-  final reflowJapanWall =
+  final reflowVideoWall =
       layout.instagramPosts.isNotEmpty &&
       firstCircle != null &&
       secondCircle != null;
 
   double reflowOffset(double left) {
-    if (!reflowJapanWall) {
+    if (!reflowVideoWall) {
       return 0;
     }
     var offset = 0.0;
@@ -765,32 +766,28 @@ GalleryTripLayout _upgradeFeaturedCircularFrameSize(GalleryTripLayout layout) {
     foodMenu: layout.foodMenu.copyWith(
       left: layout.foodMenu.left + reflowOffset(layout.foodMenu.left),
     ),
-    stripWidth: layout.stripWidth + (reflowJapanWall ? 235 : 0),
+    stripWidth: layout.stripWidth + (reflowVideoWall ? 235 : 0),
     layoutVersion: 4,
   );
 }
 
 class GalleryLayoutStore extends ChangeNotifier {
+  @visibleForTesting
+  GalleryLayoutStore.forTesting(this._globalFile);
   GalleryLayoutStore._() : _globalFile = createGlobalGalleryLayoutFile();
 
   static final GalleryLayoutStore instance = GalleryLayoutStore._();
   static const String bundledGlobalLayoutPath =
       'assets/data/gallery_layouts.json';
-  static const String _legacyStorageKey = 'everafter.gallery-layout.v1';
-  static const String _deviceOverridesKey =
-      'everafter.gallery-layout.device-overrides.v1';
 
   final GlobalGalleryLayoutFile _globalFile;
   Map<String, GalleryTripLayout> _bundledLayouts =
       <String, GalleryTripLayout>{};
-  Map<String, GalleryTripLayout> _globalLayouts = <String, GalleryTripLayout>{};
-  Map<String, Map<String, dynamic>> _deviceOverrides =
-      <String, Map<String, dynamic>>{};
   Map<String, GalleryTripLayout> _layouts = <String, GalleryTripLayout>{};
   bool _hasUnsavedChanges = false;
 
   bool get hasUnsavedChanges => _hasUnsavedChanges;
-  bool get editsGlobalLayout => kIsWeb;
+  bool get editsGlobalLayout => true;
   String? get globalSourceFileName => _globalFile.fileName;
 
   GalleryTripLayout layoutFor(String tripSlug) =>
@@ -798,38 +795,7 @@ class GalleryLayoutStore extends ChangeNotifier {
 
   Future<void> load() async {
     await _loadBundledGlobalLayouts();
-    final preferences = await SharedPreferences.getInstance();
-    _deviceOverrides = <String, Map<String, dynamic>>{};
-
-    final encodedOverrides = preferences.getString(_deviceOverridesKey);
-    if (!kIsWeb && encodedOverrides != null) {
-      try {
-        final document = jsonDecode(encodedOverrides) as Map<String, dynamic>;
-        final overrides = document['overrides'] as Map? ?? document;
-        _deviceOverrides = <String, Map<String, dynamic>>{
-          for (final entry in overrides.entries)
-            entry.key as String: Map<String, dynamic>.from(entry.value as Map),
-        };
-      } on Object {
-        _deviceOverrides = <String, Map<String, dynamic>>{};
-      }
-    } else if (!kIsWeb) {
-      final legacy = preferences.getString(_legacyStorageKey);
-      if (legacy != null) {
-        try {
-          final legacyLayouts = _decodeLayouts(
-            jsonDecode(legacy) as Map<String, dynamic>,
-          );
-          _deviceOverrides = _createOverrides(legacyLayouts);
-          await _cacheDeviceOverrides(preferences);
-          await preferences.remove(_legacyStorageKey);
-        } on Object {
-          // A malformed legacy snapshot must not hide the bundled global file.
-        }
-      }
-    }
-
-    _layouts = kIsWeb ? Map.of(_globalLayouts) : _effectiveDeviceLayouts();
+    _layouts = Map<String, GalleryTripLayout>.of(_bundledLayouts);
     _hasUnsavedChanges = false;
     notifyListeners();
   }
@@ -993,7 +959,7 @@ class GalleryLayoutStore extends ChangeNotifier {
   void fitTripToContents(String tripSlug) {
     final layout = layoutFor(tripSlug);
     const gutter = 50.0;
-    var leftEdge = tripSlug == 'japan' ? 3635.0 : 3070.0;
+    var leftEdge = galleryEditorialTitleLeft;
     var rightEdge = leftEdge + 340;
     leftEdge = math.min(leftEdge, layout.foodMenu.left);
     rightEdge = math.max(
@@ -1037,50 +1003,15 @@ class GalleryLayoutStore extends ChangeNotifier {
   }
 
   Future<void> save() async {
-    if (kIsWeb) {
-      _globalLayouts = Map<String, GalleryTripLayout>.of(_layouts);
-      await _globalFile.save(encodeGlobalGalleryLayoutDocument(_globalLayouts));
-      _hasUnsavedChanges = false;
-      notifyListeners();
-      return;
-    }
-
-    final preferences = await SharedPreferences.getInstance();
-    _deviceOverrides = _createOverrides(_layouts);
-    await _cacheDeviceOverrides(preferences);
+    await _globalFile.save(encodeGlobalGalleryLayoutDocument(_layouts));
     _hasUnsavedChanges = false;
     notifyListeners();
-  }
-
-  Map<String, GalleryTripLayout> _decodeLayouts(Map<String, dynamic> encoded) {
-    return encoded.map(
-      (slug, value) => MapEntry(
-        slug,
-        GalleryTripLayout.fromJson(
-          Map<String, dynamic>.from(value as Map),
-          tripSlug: slug,
-          fallbackStripWidth: defaultGalleryStripWidthFor(slug),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _cacheDeviceOverrides(SharedPreferences preferences) {
-    return preferences.setString(
-      _deviceOverridesKey,
-      jsonEncode(<String, Object?>{
-        'schemaVersion': 1,
-        'overrides': _deviceOverrides,
-      }),
-    );
   }
 
   Future<void> resetTrip(String tripSlug) async {
     _layouts = <String, GalleryTripLayout>{
       ..._layouts,
-      tripSlug: kIsWeb
-          ? (_bundledLayouts[tripSlug] ?? defaultGalleryLayoutFor(tripSlug))
-          : _globalLayoutFor(tripSlug),
+      tripSlug: _bundledLayouts[tripSlug] ?? defaultGalleryLayoutFor(tripSlug),
     };
     _hasUnsavedChanges = true;
     notifyListeners();
@@ -1093,50 +1024,6 @@ class GalleryLayoutStore extends ChangeNotifier {
     } on Object {
       _bundledLayouts = <String, GalleryTripLayout>{};
     }
-    _globalLayouts = Map<String, GalleryTripLayout>.of(_bundledLayouts);
-  }
-
-  GalleryTripLayout _globalLayoutFor(String tripSlug) =>
-      _globalLayouts[tripSlug] ?? defaultGalleryLayoutFor(tripSlug);
-
-  Map<String, GalleryTripLayout> _effectiveDeviceLayouts() {
-    final slugs = <String>{..._globalLayouts.keys, ..._deviceOverrides.keys};
-    return <String, GalleryTripLayout>{
-      for (final slug in slugs)
-        slug: _layoutWithPatch(
-          slug,
-          _globalLayoutFor(slug),
-          _deviceOverrides[slug],
-        ),
-    };
-  }
-
-  Map<String, Map<String, dynamic>> _createOverrides(
-    Map<String, GalleryTripLayout> layouts,
-  ) {
-    final overrides = <String, Map<String, dynamic>>{};
-    for (final entry in layouts.entries) {
-      final patch = _jsonMapDifference(
-        _globalLayoutFor(entry.key).toJson(),
-        entry.value.toJson(),
-      );
-      if (patch.isNotEmpty) overrides[entry.key] = patch;
-    }
-    return overrides;
-  }
-
-  GalleryTripLayout _layoutWithPatch(
-    String tripSlug,
-    GalleryTripLayout global,
-    Map<String, dynamic>? patch,
-  ) {
-    if (patch == null || patch.isEmpty) return global;
-    final merged = _mergeJsonMaps(global.toJson(), patch);
-    return GalleryTripLayout.fromJson(
-      merged,
-      tripSlug: tripSlug,
-      fallbackStripWidth: global.stripWidth,
-    );
   }
 
   void _markChanged() {
@@ -1187,385 +1074,377 @@ String encodeGlobalGalleryLayoutDocument(
   })}\n';
 }
 
-Map<String, dynamic> _jsonMapDifference(
-  Map<String, dynamic> global,
-  Map<String, dynamic> device,
-) {
-  final difference = <String, dynamic>{};
-  for (final entry in device.entries) {
-    final globalValue = global[entry.key];
-    final deviceValue = entry.value;
-    if (globalValue is Map && deviceValue is Map) {
-      final nested = _jsonMapDifference(
-        Map<String, dynamic>.from(globalValue),
-        Map<String, dynamic>.from(deviceValue),
-      );
-      if (nested.isNotEmpty) difference[entry.key] = nested;
-    } else if (!_jsonValuesEqual(globalValue, deviceValue)) {
-      difference[entry.key] = deviceValue;
-    }
-  }
-  return difference;
-}
-
-Map<String, dynamic> _mergeJsonMaps(
-  Map<String, dynamic> global,
-  Map<String, dynamic> patch,
-) {
-  final merged = Map<String, dynamic>.from(global);
-  for (final entry in patch.entries) {
-    final globalValue = merged[entry.key];
-    final patchValue = entry.value;
-    if (globalValue is Map && patchValue is Map) {
-      merged[entry.key] = _mergeJsonMaps(
-        Map<String, dynamic>.from(globalValue),
-        Map<String, dynamic>.from(patchValue),
-      );
-    } else {
-      merged[entry.key] = patchValue;
-    }
-  }
-  return merged;
-}
-
-bool _jsonValuesEqual(Object? first, Object? second) =>
-    jsonEncode(first) == jsonEncode(second);
-
 bool _isLocalTrinketSource(String source) =>
     source.startsWith('assets/') ||
     source.startsWith('data:image/png;base64,') ||
     source.startsWith('data:image/jpeg;base64,') ||
     source.startsWith('data:image/webp;base64,');
 
-GalleryTripLayout defaultGalleryLayoutFor(String tripSlug) {
-  const rowCenterY = 405.0;
-  const baseFrames = <GalleryFramePlacement>[
-    GalleryFramePlacement(
-      id: 'frame-0',
-      memoryIndex: 0,
-      left: 135,
-      top: rowCenterY - 136,
-      width: 190,
-      height: 272,
-      style: GalleryFrameStyle.oval,
-      alignmentX: 0.15,
-      alignmentY: -0.2,
-      portrait: true,
-    ),
-    GalleryFramePlacement(
-      id: 'frame-1',
-      memoryIndex: 1,
-      left: 576,
-      top: rowCenterY - 127,
-      width: 178,
-      height: 254,
-      style: GalleryFrameStyle.portrait,
-      alignmentX: -0.22,
-      alignmentY: -0.05,
-      portrait: true,
-    ),
-    GalleryFramePlacement(
-      id: 'frame-2',
-      memoryIndex: 2,
-      left: 970,
-      top: rowCenterY - 110,
-      width: featuredCircularFrameSize,
-      height: featuredCircularFrameSize,
-      style: GalleryFrameStyle.circular,
-      alignmentX: 0.28,
-      alignmentY: -0.18,
-    ),
-    GalleryFramePlacement(
-      id: 'frame-3',
-      memoryIndex: 3,
-      left: 1443,
-      top: rowCenterY - 93,
-      width: 232,
-      height: 186,
-      style: GalleryFrameStyle.horizontalOval,
-      alignmentX: 0.2,
-      alignmentY: 0.08,
-    ),
-    GalleryFramePlacement(
-      id: 'frame-4',
-      memoryIndex: 4,
-      left: 2225,
-      top: rowCenterY - 128.5,
-      width: 180,
-      height: 257,
-      style: GalleryFrameStyle.portrait,
-      alignmentX: -0.28,
-      alignmentY: 0.08,
-      portrait: true,
-    ),
-    GalleryFramePlacement(
-      id: 'frame-5',
-      memoryIndex: 5,
-      left: 2685,
-      top: rowCenterY - 90.5,
-      width: 226,
-      height: 181,
-      style: GalleryFrameStyle.landscape,
-      alignmentX: 0.26,
-      alignmentY: -0.08,
-    ),
-    GalleryFramePlacement(
-      id: 'frame-6',
-      memoryIndex: 6,
-      left: 3570,
-      top: rowCenterY - 90.5,
-      width: 226,
-      height: 181,
-      style: GalleryFrameStyle.landscape,
-      alignmentX: -0.18,
-      alignmentY: 0.14,
-    ),
-    GalleryFramePlacement(
-      id: 'frame-7',
-      memoryIndex: 7,
-      left: 4075,
-      top: rowCenterY - 127,
-      width: 178,
-      height: 254,
-      style: GalleryFrameStyle.portrait,
-      alignmentX: 0.2,
-      alignmentY: -0.12,
-      portrait: true,
-    ),
-    GalleryFramePlacement(
-      id: 'frame-8',
-      memoryIndex: 8,
-      left: 4463,
-      top: rowCenterY - 110,
-      width: featuredCircularFrameSize,
-      height: featuredCircularFrameSize,
-      style: GalleryFrameStyle.circular,
-      alignmentX: -0.2,
-      alignmentY: 0.12,
-    ),
-    GalleryFramePlacement(
-      id: 'frame-9',
-      memoryIndex: 9,
-      left: 4920,
-      top: rowCenterY - 89,
-      width: 222,
-      height: 178,
-      style: GalleryFrameStyle.horizontalOval,
-      alignmentX: 0.18,
-      alignmentY: 0.12,
-    ),
-    GalleryFramePlacement(
-      id: 'frame-10',
-      memoryIndex: 10,
-      left: 5420,
-      top: rowCenterY - 128.5,
-      width: 180,
-      height: 257,
-      style: GalleryFrameStyle.oval,
-      alignmentX: 0.08,
-      alignmentY: -0.16,
-      portrait: true,
-    ),
-    GalleryFramePlacement(
-      id: 'frame-11',
-      memoryIndex: 11,
-      left: 5845,
-      top: rowCenterY - 125.5,
-      width: 176,
-      height: 251,
-      style: GalleryFrameStyle.portrait,
-      alignmentX: 0.22,
-      alignmentY: 0.04,
-      portrait: true,
-    ),
-  ];
-
-  final frames = switch (tripSlug) {
-    'japan' => <GalleryFramePlacement>[
-      baseFrames[0].copyWith(scale: 0.90 * 1.10, angle: -0.012),
-      baseFrames[1].copyWith(left: 1193, scale: 1.08 * 1.10, angle: 0.014),
-      baseFrames[2].copyWith(left: 1947, scale: 0.92 * 1.10, angle: -0.01),
-      baseFrames[3].copyWith(left: 2877, scale: 1.07 * 1.10, angle: 0.01),
-      baseFrames[4].copyWith(left: 4125, scale: 0.96 * 1.10, angle: 0.012),
-      baseFrames[5].copyWith(left: 4931, scale: 1.04 * 1.10, angle: -0.008),
-      baseFrames[6].copyWith(left: 5539, scale: 1.02 * 1.10, angle: 0.009),
-      baseFrames[7].copyWith(left: 6511, scale: 0.92 * 1.10, angle: -0.013),
-      baseFrames[8].copyWith(left: 6968, scale: 1.08 * 1.10, angle: 0.008),
-      baseFrames[9].copyWith(left: 7768, scale: 1.04 * 1.10, angle: -0.008),
-      baseFrames[10].copyWith(left: 8314, scale: 0.94 * 1.10, angle: 0.011),
-      baseFrames[11].copyWith(left: 8784, scale: 1.07 * 1.10, angle: -0.01),
-    ],
-    'south-korea' => <GalleryFramePlacement>[
-      for (final frame in baseFrames)
-        frame.copyWith(visible: frame.memoryIndex < 5),
-    ],
-    _ => baseFrames,
-  };
-
-  final trinkets = tripSlug == 'south-korea'
-      ? const <GalleryTrinketPlacement>[
-          GalleryTrinketPlacement(
-            id: 'demo-keepsake-1',
-            assetName: 'assets/images/experience/china-nfc-magnet-reveal.png',
-            label: 'Demo keepsake one',
-            left: 2515,
-            top: 242,
-            width: 470,
-            height: 326,
-          ),
-          GalleryTrinketPlacement(
-            id: 'demo-keepsake-2',
-            assetName:
-                'assets/images/experience/hong-kong-nfc-magnet-reveal.png',
-            label: 'Demo keepsake two',
-            left: 3360,
-            top: 197.5,
-            width: 280,
-            height: 415,
-          ),
-          GalleryTrinketPlacement(
-            id: 'demo-keepsake-3',
-            assetName:
-                'assets/images/experience/japan-nfc-magnet-reveal-fox.png',
-            label: 'Demo keepsake three',
-            left: 4015,
-            top: 228,
-            width: 470,
-            height: 354,
-          ),
-          GalleryTrinketPlacement(
-            id: 'demo-keepsake-4',
-            assetName:
-                'assets/images/experience/taiwan-nfc-magnet-reveal-bubble-tea.png',
-            label: 'Demo keepsake four',
-            left: 4860,
-            top: 194.5,
-            width: 280,
-            height: 421,
-          ),
-          GalleryTrinketPlacement(
-            id: 'demo-keepsake-5',
-            assetName:
-                'assets/images/experience/vietnam-nfc-magnet-reveal-lotus.png',
-            label: 'Demo keepsake five',
-            left: 5555,
-            top: 206.5,
-            width: 390,
-            height: 397,
-          ),
-        ]
-      : const <GalleryTrinketPlacement>[];
-
-  final layout = GalleryTripLayout(
-    frames: <GalleryFramePlacement>[
-      for (final frame in frames) frame.normalizedArtworkAspectRatio(),
-    ],
-    trinkets: trinkets,
-    instagramPosts: defaultInstagramPlacementsFor(tripSlug),
-    stripWidth: defaultGalleryStripWidthFor(tripSlug),
-    foodMenu: defaultFoodMenuPlacementFor(tripSlug),
-    leadingTrim: 0,
-    layoutVersion: tripSlug == 'japan' ? 1 : 2,
-  );
-  final instagramUpgraded = tripSlug == 'japan'
-      ? _upgradeJapanInstagramFrameScale(layout)
-      : layout;
-  return _upgradeFeaturedCircularFrameSize(
-    _upgradeCircularFrameMix(instagramUpgraded),
-  );
-}
-
-List<GalleryInstagramPlacement> defaultInstagramPlacementsFor(String tripSlug) {
-  if (tripSlug != 'japan') {
-    return const <GalleryInstagramPlacement>[];
-  }
-  return const <GalleryInstagramPlacement>[
-    GalleryInstagramPlacement(
-      id: 'instagram-0',
-      postIndex: 0,
-      left: 470,
-      top: 205,
-      width: 272,
-      height: 400,
-      style: GalleryFrameStyle.oval,
-      angle: 0,
-    ),
-    GalleryInstagramPlacement(
-      id: 'instagram-1',
-      postIndex: 1,
-      left: 1545,
-      top: 205,
-      width: 272,
-      height: 400,
-      style: GalleryFrameStyle.portrait,
-      angle: 0,
-    ),
-    GalleryInstagramPlacement(
-      id: 'instagram-2',
-      postIndex: 2,
-      left: 2255,
-      top: 269,
-      width: 400,
-      height: 272,
-      style: GalleryFrameStyle.horizontalOval,
-      angle: 0,
-    ),
-    GalleryInstagramPlacement(
-      id: 'instagram-3',
-      postIndex: 3,
-      left: 3335,
-      top: 269,
-      width: 272,
-      height: 272,
-      style: GalleryFrameStyle.circular,
-      angle: 0,
-    ),
-    GalleryInstagramPlacement(
-      id: 'instagram-4',
-      postIndex: 4,
-      left: 4455,
-      top: 205,
-      width: 272,
-      height: 400,
-      style: GalleryFrameStyle.portrait,
-      angle: 0,
-    ),
-    GalleryInstagramPlacement(
-      id: 'instagram-5',
-      postIndex: 5,
-      left: 5970,
-      top: 269,
-      width: 400,
-      height: 272,
-      style: GalleryFrameStyle.horizontalOval,
-      angle: 0,
-    ),
-    GalleryInstagramPlacement(
-      id: 'instagram-6',
-      postIndex: 6,
-      left: 7295,
-      top: 269,
-      width: 272,
-      height: 272,
-      style: GalleryFrameStyle.circular,
-      angle: 0,
-    ),
-  ];
-}
-
-double defaultGalleryStripWidthFor(String tripSlug) => switch (tripSlug) {
-  'japan' => 9180,
-  'south-korea' => 6800,
-  _ => 6240,
+const Map<String, dynamic> _galleryWallTemplate = {
+  "frames": [
+    {
+      "id": "frame-0",
+      "memoryIndex": 0,
+      "left": 135.0,
+      "top": 269.0,
+      "width": 190.0,
+      "height": 272.0,
+      "style": "oval",
+      "alignmentX": 0.15,
+      "alignmentY": -0.2,
+      "scale": 0.9900000000000001,
+      "angle": -0.012,
+      "portrait": true,
+      "visible": true,
+      "title": "",
+      "photoAssetPaths": [],
+      "photoEdits": [],
+      "lockAspectRatio": true,
+      "isCustom": false,
+    },
+    {
+      "id": "frame-1",
+      "memoryIndex": 1,
+      "left": 1329.0,
+      "top": 278.0,
+      "width": 178.0,
+      "height": 254.0,
+      "style": "portrait",
+      "alignmentX": -0.22,
+      "alignmentY": -0.05,
+      "scale": 1.1880000000000002,
+      "angle": 0.014,
+      "portrait": true,
+      "visible": true,
+      "title": "",
+      "photoAssetPaths": [],
+      "photoEdits": [],
+      "lockAspectRatio": true,
+      "isCustom": false,
+    },
+    {
+      "id": "frame-2",
+      "memoryIndex": 2,
+      "left": 2243.0,
+      "top": 295.0,
+      "width": 220.0,
+      "height": 220.0,
+      "style": "circular",
+      "alignmentX": 0.28,
+      "alignmentY": -0.18,
+      "scale": 1.0120000000000002,
+      "angle": -0.01,
+      "portrait": false,
+      "visible": true,
+      "title": "",
+      "photoAssetPaths": [],
+      "photoEdits": [],
+      "lockAspectRatio": true,
+      "isCustom": false,
+    },
+    {
+      "id": "frame-3",
+      "memoryIndex": 3,
+      "left": 3454.0,
+      "top": 326.12,
+      "width": 232.0,
+      "height": 157.76,
+      "style": "horizontalOval",
+      "alignmentX": 0.2,
+      "alignmentY": 0.08,
+      "scale": 1.1770000000000003,
+      "angle": 0.01,
+      "portrait": false,
+      "visible": true,
+      "title": "",
+      "photoAssetPaths": [],
+      "photoEdits": [],
+      "lockAspectRatio": true,
+      "isCustom": false,
+    },
+    {
+      "id": "frame-4",
+      "memoryIndex": 4,
+      "left": 4838.0,
+      "top": 276.5,
+      "width": 180.0,
+      "height": 257.0,
+      "style": "portrait",
+      "alignmentX": -0.28,
+      "alignmentY": 0.08,
+      "scale": 1.056,
+      "angle": 0.012,
+      "portrait": true,
+      "visible": true,
+      "title": "",
+      "photoAssetPaths": [],
+      "photoEdits": [],
+      "lockAspectRatio": true,
+      "isCustom": false,
+    },
+    {
+      "id": "frame-5",
+      "memoryIndex": 5,
+      "left": 5780.0,
+      "top": 314.5,
+      "width": 226.0,
+      "height": 181.0,
+      "style": "landscape",
+      "alignmentX": 0.26,
+      "alignmentY": -0.08,
+      "scale": 1.1440000000000001,
+      "angle": -0.008,
+      "portrait": false,
+      "visible": true,
+      "title": "",
+      "photoAssetPaths": [],
+      "photoEdits": [],
+      "lockAspectRatio": true,
+      "isCustom": false,
+    },
+    {
+      "id": "frame-6",
+      "memoryIndex": 6,
+      "left": 6388.0,
+      "top": 314.5,
+      "width": 226.0,
+      "height": 181.0,
+      "style": "landscape",
+      "alignmentX": -0.18,
+      "alignmentY": 0.14,
+      "scale": 1.122,
+      "angle": 0.009,
+      "portrait": false,
+      "visible": true,
+      "title": "",
+      "photoAssetPaths": [],
+      "photoEdits": [],
+      "lockAspectRatio": true,
+      "isCustom": false,
+    },
+    {
+      "id": "frame-7",
+      "memoryIndex": 7,
+      "left": 7560.0,
+      "top": 278.0,
+      "width": 178.0,
+      "height": 254.0,
+      "style": "portrait",
+      "alignmentX": 0.2,
+      "alignmentY": -0.12,
+      "scale": 1.0120000000000002,
+      "angle": -0.013,
+      "portrait": true,
+      "visible": true,
+      "title": "",
+      "photoAssetPaths": [],
+      "photoEdits": [],
+      "lockAspectRatio": true,
+      "isCustom": false,
+    },
+    {
+      "id": "frame-8",
+      "memoryIndex": 8,
+      "left": 8057.0,
+      "top": 295.0,
+      "width": 220.0,
+      "height": 220.0,
+      "style": "circular",
+      "alignmentX": -0.2,
+      "alignmentY": 0.12,
+      "scale": 1.1880000000000002,
+      "angle": 0.008,
+      "portrait": false,
+      "visible": true,
+      "title": "",
+      "photoAssetPaths": [],
+      "photoEdits": [],
+      "lockAspectRatio": true,
+      "isCustom": false,
+    },
+    {
+      "id": "frame-9",
+      "memoryIndex": 9,
+      "left": 9083.0,
+      "top": 329.52,
+      "width": 222.0,
+      "height": 150.95999999999998,
+      "style": "horizontalOval",
+      "alignmentX": 0.18,
+      "alignmentY": 0.12,
+      "scale": 1.1440000000000001,
+      "angle": -0.008,
+      "portrait": false,
+      "visible": true,
+      "title": "",
+      "photoAssetPaths": [],
+      "photoEdits": [],
+      "lockAspectRatio": true,
+      "isCustom": false,
+    },
+    {
+      "id": "frame-10",
+      "memoryIndex": 10,
+      "left": 9629.0,
+      "top": 276.5,
+      "width": 180.0,
+      "height": 257.0,
+      "style": "oval",
+      "alignmentX": 0.08,
+      "alignmentY": -0.16,
+      "scale": 1.034,
+      "angle": 0.011,
+      "portrait": true,
+      "visible": true,
+      "title": "",
+      "photoAssetPaths": [],
+      "photoEdits": [],
+      "lockAspectRatio": true,
+      "isCustom": false,
+    },
+    {
+      "id": "frame-11",
+      "memoryIndex": 11,
+      "left": 10099.0,
+      "top": 279.5,
+      "width": 176.0,
+      "height": 251.0,
+      "style": "portrait",
+      "alignmentX": 0.22,
+      "alignmentY": 0.04,
+      "scale": 1.1770000000000003,
+      "angle": -0.01,
+      "portrait": true,
+      "visible": true,
+      "title": "",
+      "photoAssetPaths": [],
+      "photoEdits": [],
+      "lockAspectRatio": true,
+      "isCustom": false,
+    },
+  ],
+  "trinkets": [],
+  "instagramPosts": [
+    {
+      "id": "instagram-0",
+      "postIndex": 0,
+      "left": 538.0,
+      "top": 205.0,
+      "width": 272.0,
+      "height": 400.0,
+      "style": "oval",
+      "angle": 0.0,
+      "scale": 1.5,
+      "visible": true,
+    },
+    {
+      "id": "instagram-1",
+      "postIndex": 1,
+      "left": 1749.0,
+      "top": 205.0,
+      "width": 272.0,
+      "height": 400.0,
+      "style": "portrait",
+      "angle": 0.0,
+      "scale": 1.5,
+      "visible": true,
+    },
+    {
+      "id": "instagram-2",
+      "postIndex": 2,
+      "left": 2732.0,
+      "top": 269.0,
+      "width": 400.0,
+      "height": 272.0,
+      "style": "horizontalOval",
+      "angle": 0.0,
+      "scale": 1.5,
+      "visible": true,
+    },
+    {
+      "id": "instagram-3",
+      "postIndex": 3,
+      "left": 3980.0,
+      "top": 269.0,
+      "width": 272.0,
+      "height": 272.0,
+      "style": "circular",
+      "angle": 0.0,
+      "scale": 1.5,
+      "visible": true,
+    },
+    {
+      "id": "instagram-4",
+      "postIndex": 4,
+      "left": 5236.0,
+      "top": 205.0,
+      "width": 272.0,
+      "height": 400.0,
+      "style": "portrait",
+      "angle": 0.0,
+      "scale": 1.5,
+      "visible": true,
+    },
+    {
+      "id": "instagram-5",
+      "postIndex": 5,
+      "left": 6919.0,
+      "top": 269.0,
+      "width": 400.0,
+      "height": 272.0,
+      "style": "horizontalOval",
+      "angle": 0.0,
+      "scale": 1.5,
+      "visible": true,
+    },
+    {
+      "id": "instagram-6",
+      "postIndex": 6,
+      "left": 8542.0,
+      "top": 269.0,
+      "width": 272.0,
+      "height": 272.0,
+      "style": "circular",
+      "angle": 0.0,
+      "scale": 1.5,
+      "visible": true,
+    },
+  ],
+  "stripWidth": 10495.0,
+  "foodMenu": {
+    "id": "food-menu",
+    "left": 916.0,
+    "top": 322.0,
+    "width": 250.0,
+    "height": 166.0,
+    "angle": 0.0,
+  },
+  "leadingTrim": 0.0,
+  "travelStartDate": null,
+  "travelEndDate": null,
+  "layoutVersion": 4,
 };
 
+GalleryTripLayout defaultGalleryLayoutFor(String tripSlug) =>
+    GalleryTripLayout.fromJson(
+      Map<String, dynamic>.from(_galleryWallTemplate),
+      tripSlug: tripSlug,
+      fallbackStripWidth: defaultGalleryStripWidthFor(tripSlug),
+    );
+
+List<GalleryInstagramPlacement> defaultInstagramPlacementsFor(
+  String tripSlug,
+) => <GalleryInstagramPlacement>[
+  for (final item in _galleryWallTemplate['instagramPosts'] as List)
+    GalleryInstagramPlacement.fromJson(Map<String, dynamic>.from(item as Map)),
+];
+
+double defaultGalleryStripWidthFor(String tripSlug) =>
+    (_galleryWallTemplate['stripWidth'] as num).toDouble();
+
 GalleryDecorationPlacement defaultFoodMenuPlacementFor(String tripSlug) =>
-    GalleryDecorationPlacement(
-      id: 'food-menu',
-      left: tripSlug == 'japan' ? 780 : 1838,
-      top: 322,
-      width: 250,
-      height: 166,
+    GalleryDecorationPlacement.fromJson(
+      Map<String, dynamic>.from(_galleryWallTemplate['foodMenu'] as Map),
     );
 
 String formatGalleryTravelDate(DateTime date) {

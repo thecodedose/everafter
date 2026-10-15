@@ -3,7 +3,8 @@ import 'dart:ui_web' as ui_web;
 import 'package:flutter/widgets.dart';
 import 'package:web/web.dart' as web;
 
-bool get usesWebMemoryVideoSurface => true;
+String _videoAssetUrl(String path) =>
+    Uri.parse(web.document.baseURI).resolve('assets/$path').toString();
 
 class WebMemoryVideoSurface extends StatefulWidget {
   const WebMemoryVideoSurface({
@@ -31,12 +32,12 @@ class _WebMemoryVideoSurfaceState extends State<WebMemoryVideoSurface> {
     _viewType = 'everafter-memory-video-${_nextId++}';
     ui_web.platformViewRegistry.registerViewFactory(_viewType, (viewId) {
       final element = web.HTMLVideoElement()
-        ..src = widget.assetPath
+        ..src = _videoAssetUrl(widget.assetPath)
         ..autoplay = true
         ..loop = true
         ..muted = widget.muted
         ..controls = false
-        ..preload = 'auto'
+        ..preload = 'metadata'
         ..setAttribute('playsinline', 'true');
       element.style
         ..width = '100%'
@@ -60,7 +61,7 @@ class _WebMemoryVideoSurfaceState extends State<WebMemoryVideoSurface> {
     }
     if (oldWidget.assetPath != widget.assetPath) {
       element
-        ..src = widget.assetPath
+        ..src = _videoAssetUrl(widget.assetPath)
         ..load();
     }
     if (oldWidget.muted != widget.muted) {
