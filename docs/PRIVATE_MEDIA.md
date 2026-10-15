@@ -1,47 +1,44 @@
 # Private media boundary
 
-The public EverAfter repository is a runnable demo, not a copy of a personal
-travel archive. The app uses anonymous NFC identifiers, omitted dates, NASA
-globe artwork, and an abstract generated video anywhere a photo or reel would
-normally appear.
+The public repository uses redistributable demo images and an abstract video.
+This cleanup does not import personal photos, videos, travel dates, or archives.
 
-Keep personal material in the existing ignored locations:
+Keep original media in the existing ignored paths, including
+`assets/memories/`, `assets/images/japan/`, `assets/images/trips/`, and
+private JPGs under `assets/images/taste/`. Keep a separate backup.
+Do not remove these exclusions during the web-only cleanup.
 
-- `assets/memories/` for photos, videos, posters, manifests, and keepsake scans;
-- `assets/images/japan/`, `assets/images/trips/`, and JPG files under
-  `assets/images/taste/` for imported or derived trip photography;
-- `models/fridge_magnet/reference_images/` for object reference photography;
-- `artifacts/` and `tmp/` for screenshots, comparisons, and working files.
+Ignoring a file only prevents an ordinary new Git add. It does not protect
+a file already tracked in Git, and it does not make a published web asset
+private. A private Git repository also does not make a public website private.
+Anyone able to load a static gallery can retrieve the media bundled with it.
+A hard-to-guess trip URL is not access control.
 
-Those paths are deliberately absent from `pubspec.yaml`, so a clean clone does
-not require or bundle them. If you build a private edition, keep its asset
-manifest and data bindings in an ignored local overlay or a separate private
-repository. Do not replace the public demo paths with personal filenames in a
-public branch.
+For an intentionally private edition, keep media declarations and collection
+bindings in a private checkout/overlay and choose hosting that restricts
+access before deployment. Do not publish its generated build publicly.
+No authentication or private-media backend is included in this project.
 
-The gallery editor does not accept browser uploads. Add private trip media under
-`assets/memories/<trip-slug>/`, then register it in the trip's private data and
-asset manifest before rebuilding. Bundled trinket artwork lives under
-`assets/images/experience/` and is listed in `galleryTrinketAssetChoices` in
-`lib/data/gallery_memory_content.dart`. Keep private originals in the ignored
-overlay described above and never commit exported preference data.
+To register media for an approved audience:
 
-The shared layout source is `assets/data/gallery_layouts.json`. It must contain
-only public-safe asset paths and labels on a public branch. Device-specific
-layout overrides remain in platform application preferences and should not be
-copied into the repository.
+1. Put files under `assets/memories/<trip-slug>/` in the private workspace.
+2. Declare only the intended directories/files in that edition's pubspec.
+3. Register photos and videos in the matching entry in `lib/data/trip_collections.dart`. Videos need
+   poster images and appropriate `videoPosterPaths` entries.
+4. Keep exported layout JSON private if it includes sensitive labels, dates,
+   filenames, or embedded images. Review it before placing it in the public
+   `assets/data/gallery_layouts.json`.
 
-For a private iPhone build, follow [`IOS_SETUP.md`](IOS_SETUP.md). Its media
-section explains both required steps: declaring the ignored asset directory in
-a private `pubspec.yaml` and registering each photo, video, and poster in the
-matching trip collection.
+The editor does not upload media. Trinket artwork must be bundled and
+registered in `galleryTrinketAssetChoices`. Existing embedded trinkets remain
+readable for compatibility.
 
-Before publishing a change, review the exact candidate set:
+Before committing, review specific changed files with `git diff`,
+`git status --short --ignored`, and `git add -n .`.
+Do not stage personal media or private exports. Review the release asset
+inventory separately before deploying.
 
-```sh
-git add -n .
-git status --short --ignored
-```
-
-Also search candidate source and documentation for credentials, absolute home
-paths, physical NFC UIDs, social-media permalinks, and exact private dates.
+See [Web setup](WEB_SETUP.md) for URL routing and layout export.
+The 13 trip names are metadata, not evidence that any real media has been
+imported. Keep year-specific folders and bindings separate, including the two
+Royal Caribbean trips.

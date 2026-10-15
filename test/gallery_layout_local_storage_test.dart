@@ -1,137 +1,100 @@
-import 'dart:convert';
-
 import 'package:everafter/data/gallery_layout.dart';
+import 'package:everafter/services/global_gallery_layout_file.dart';
+import 'package:everafter/data/trip_catalog.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+class _Exporter implements GlobalGalleryLayoutFile {
+  String? saved;
+  bool fail = false;
+  @override
+  String? get fileName => saved == null ? null : 'gallery_layouts.json';
+  @override
+  Future<void> save(String contents) async {
+    if (fail) throw StateError('Export failed');
+    saved = contents;
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  TestWidgetsFlutterBinding.ensureInitialized();
+  test('Royal Caribbean years keep independent layout edits', () async {
+    final store = GalleryLayoutStore.forTesting(_Exporter());
+    addTearDown(store.dispose);
+    await store.load();
+    final oldTrip = store.layoutFor('royal-caribbean-2024').toJson();
+    final newFrame = store.layoutFor('royal-caribbean-2026').frames.first;
+    store.updateFrame(
+      'royal-caribbean-2026',
+      newFrame.copyWith(title: '2026 only'),
+    );
+    expect(store.layoutFor('royal-caribbean-2024').toJson(), oldTrip);
+    expect(
+      store.layoutFor('royal-caribbean-2026').frames.first.title,
+      '2026 only',
+    );
+  });
 
-  test(
-    'loads, migrates, and saves gallery layouts only in local preferences',
-    () async {
-      const legacyStorageKey = 'everafter.gallery-layout.v1';
-      const overridesKey = 'everafter.gallery-layout.device-overrides.v1';
-      const embeddedImage =
-          'data:image/png;base64,'
-          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ'
-          'AAAADUlEQVR42mNk+M/wHwAF/gL+XKzLAAAAAElFTkSuQmCC';
-      final storedLayout = defaultGalleryLayoutFor('japan').toJson()
-        ..['stripWidth'] = 4321
-        ..['trinkets'] = <Map<String, Object?>>[
-          <String, Object?>{
-            'id': 'legacy-cloud-trinket',
-            'assetName': 'https://old-backend.invalid/trinket.png',
-            'label': 'Cloud only',
-            'left': 10,
-            'top': 20,
-            'width': 30,
-            'height': 40,
-            'storageKey': 'obsolete/cloud/key.png',
-          },
-          <String, Object?>{
-            'id': 'local-trinket',
-            'assetName': embeddedImage,
-            'label': 'Local image',
-            'left': 50,
-            'top': 60,
-            'width': 70,
-            'height': 80,
-            'isCustom': true,
-          },
-        ];
-      SharedPreferences.setMockInitialValues(<String, Object>{
-        legacyStorageKey: jsonEncode(<String, Object?>{'japan': storedLayout}),
-      });
-
-      final store = GalleryLayoutStore.instance;
-      await store.load();
-
-      final loaded = store.layoutFor('japan');
-      expect(loaded.stripWidth, 4321);
-      expect(loaded.trinkets.map((item) => item.id), <String>['local-trinket']);
-      expect(store.hasUnsavedChanges, isFalse);
-
-      store.updateFrame(
-        'japan',
-        loaded.frames.first.copyWith(title: 'Saved on this device'),
-      );
-      await store.save();
-
-      final preferences = await SharedPreferences.getInstance();
-      final saved = preferences.getString(overridesKey)!;
-      expect(saved, contains('Saved on this device'));
-      expect(saved, contains(embeddedImage));
-      expect(saved, isNot(contains('old-backend.invalid')));
-      expect(saved, isNot(contains('storageKey')));
-      expect(preferences.getString(legacyStorageKey), isNull);
-      expect(store.hasUnsavedChanges, isFalse);
-    },
-  );
-
-  test(
-    'stores only changed global layout sections as a device override',
-    () async {
-      const overridesKey = 'everafter.gallery-layout.device-overrides.v1';
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-
-      final store = GalleryLayoutStore.instance;
-      await store.load();
-      final globalFrame = store.layoutFor('japan').frames.first;
-      store.updateFrame(
-        'japan',
-        globalFrame.copyWith(title: 'Only on this device'),
-      );
-      await store.save();
-
-      final preferences = await SharedPreferences.getInstance();
-      final document = jsonDecode(preferences.getString(overridesKey)!) as Map;
-      final japan = (document['overrides'] as Map)['japan'] as Map;
-      expect(japan.keys, contains('frames'));
-      expect(japan.keys, isNot(contains('foodMenu')));
-      expect(japan.keys, isNot(contains('stripWidth')));
-      expect(jsonEncode(japan), contains('Only on this device'));
-    },
-  );
-
-  test('global layout document round-trips all bundled data', () {
+  test('global layout document round-trips every field', () {
     final original = <String, GalleryTripLayout>{
-      'japan': defaultGalleryLayoutFor('japan'),
-      'south-korea': defaultGalleryLayoutFor('south-korea'),
+      'spain-2026': defaultGalleryLayoutFor('spain-2026'),
+      'royal-caribbean-2024': defaultGalleryLayoutFor('royal-caribbean-2024'),
     };
     final decoded = decodeGlobalGalleryLayoutDocument(
       encodeGlobalGalleryLayoutDocument(original),
     );
-
     expect(decoded.keys, original.keys);
-    expect(decoded['japan']!.toJson(), original['japan']!.toJson());
-    expect(decoded['south-korea']!.toJson(), original['south-korea']!.toJson());
+    for (final slug in original.keys) {
+      expect(decoded[slug]!.toJson(), original[slug]!.toJson());
+    }
   });
 
-  test('bundled global JSON contains every trip layout', () async {
+  test('bundled JSON contains every existing destination', () async {
     final contents = await rootBundle.loadString(
       GalleryLayoutStore.bundledGlobalLayoutPath,
     );
     final layouts = decodeGlobalGalleryLayoutDocument(contents);
-
     expect(
       layouts.keys,
-      containsAll(<String>[
-        'japan',
-        'south-korea',
-        'china',
-        'philippines',
-        'turkey',
-        'taiwan',
-        'hong-kong',
-        'thailand',
-        'malaysia',
-        'bali',
-        'vietnam',
-        'sri-lanka',
-      ]),
+      unorderedEquals(tripGalleryItems.map((trip) => trip.slug)),
     );
-    expect(layouts, hasLength(12));
+  });
+
+  test(
+    'export preserves edits and clears the pending flag after success',
+    () async {
+      final exporter = _Exporter();
+      final store = GalleryLayoutStore.forTesting(exporter);
+      addTearDown(store.dispose);
+      await store.load();
+      final original = store.layoutFor('spain-2026');
+      store.updateFrame(
+        'spain-2026',
+        original.frames.first.copyWith(title: 'Exported title'),
+      );
+      expect(store.hasUnsavedChanges, isTrue);
+      await store.save();
+      final exported = decodeGlobalGalleryLayoutDocument(exporter.saved!);
+      expect(exported['spain-2026']!.frames.first.title, 'Exported title');
+      expect(store.hasUnsavedChanges, isFalse);
+      await store.resetTrip('spain-2026');
+      expect(store.layoutFor('spain-2026').toJson(), original.toJson());
+      expect(store.hasUnsavedChanges, isTrue);
+    },
+  );
+
+  test('failed export preserves pending edits', () async {
+    final exporter = _Exporter()..fail = true;
+    final store = GalleryLayoutStore.forTesting(exporter);
+    addTearDown(store.dispose);
+    await store.load();
+    store.updateFrame(
+      'spain-2026',
+      store.layoutFor('spain-2026').frames.first.copyWith(title: 'Keep me'),
+    );
+    await expectLater(store.save(), throwsStateError);
+    expect(store.hasUnsavedChanges, isTrue);
+    expect(store.layoutFor('spain-2026').frames.first.title, 'Keep me');
   });
 }

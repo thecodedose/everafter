@@ -1,29 +1,31 @@
+import 'gallery_fixtures.dart';
 import 'dart:math' as math;
 
 import 'package:everafter/data/gallery_layout.dart';
 import 'package:everafter/data/gallery_memory_content.dart';
 import 'package:everafter/screens/gallery_admin_screen.dart';
 import 'package:everafter/widgets/gallery_trinket_image.dart';
-import 'package:everafter/widgets/trip_gallery.dart';
+import 'package:everafter/data/trip_catalog.dart';
 import 'package:everafter/widgets/trip_journey.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('selected frames and trinkets resize from a drag handle', (
+  setUp(installGalleryFixtures);
+  galleryTest('selected frames and trinkets resize from a drag handle', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1280, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final store = GalleryLayoutStore.instance;
-    addTearDown(() => store.resetTrip('japan'));
+    addTearDown(() => store.resetTrip('spain-2026'));
     final trinket = store.addTrinket(
-      'japan',
+      'spain-2026',
       assetName: galleryTrinketAssetChoices.first,
       label: 'Resize test trinket',
     );
     store.updateTrinket(
-      'japan',
+      'spain-2026',
       trinket.copyWith(left: 760, top: 40, width: 180, height: 120),
     );
 
@@ -32,14 +34,14 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('admin-frame-frame-0')));
     await tester.pump();
-    final frameBefore = store.layoutFor('japan').frames.first;
+    final frameBefore = store.layoutFor('spain-2026').frames.first;
     final frameAspectRatio = frameBefore.width / frameBefore.height;
     await tester.drag(
       find.byKey(const ValueKey('admin-frame-resize-frame-0')),
       const Offset(24, 24),
     );
     await tester.pump();
-    final frameAfter = store.layoutFor('japan').frames.first;
+    final frameAfter = store.layoutFor('spain-2026').frames.first;
     expect(frameAfter.width, greaterThan(frameBefore.width));
     expect(frameAfter.height, greaterThan(frameBefore.height));
     expect(
@@ -48,13 +50,15 @@ void main() {
     );
 
     await tester.tap(
-      find.byKey(const ValueKey('admin-item-selector-japan-frame:frame-0')),
+      find.byKey(
+        const ValueKey('admin-item-selector-spain-2026-frame:frame-0'),
+      ),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Resize test trinket').last);
     await tester.pumpAndSettle();
     final trinketBefore = store
-        .layoutFor('japan')
+        .layoutFor('spain-2026')
         .trinkets
         .firstWhere((item) => item.id == trinket.id);
     final trinketAspectRatio = trinketBefore.width / trinketBefore.height;
@@ -64,7 +68,7 @@ void main() {
     );
     await tester.pump();
     final trinketAfter = store
-        .layoutFor('japan')
+        .layoutFor('spain-2026')
         .trinkets
         .firstWhere((item) => item.id == trinket.id);
     expect(trinketAfter.width, greaterThan(trinketBefore.width));
@@ -75,12 +79,12 @@ void main() {
     );
   });
 
-  testWidgets('admin shows editable frames and tracks local changes', (
+  galleryTest('admin shows editable frames and tracks local changes', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1280, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    addTearDown(() => GalleryLayoutStore.instance.resetTrip('japan'));
+    addTearDown(() => GalleryLayoutStore.instance.resetTrip('spain-2026'));
     await tester.pumpWidget(const MaterialApp(home: GalleryAdminScreen()));
     await tester.pump();
 
@@ -98,11 +102,11 @@ void main() {
       find.byKey(const ValueKey('admin-instagram-instagram-0')),
       findsOneWidget,
     );
-    expect(find.text('TASTE OF JAPAN'), findsOneWidget);
+    expect(find.text('TASTE OF SPAIN 2026'), findsOneWidget);
     expect(find.text('MEMORIES OF'), findsOneWidget);
-    expect(find.text('JAPAN'), findsOneWidget);
+    expect(find.text('SPAIN 2026'), findsOneWidget);
     expect(find.text('IN MOTION'), findsOneWidget);
-    expect(find.text('Arrange frames and trinkets'), findsOneWidget);
+    expect(find.textContaining('Drag an item to move it.'), findsOneWidget);
     expect(find.byKey(const ValueKey('admin-fit-gallery')), findsOneWidget);
     expect(
       tester.getSize(find.byKey(const ValueKey('admin-gallery-canvas'))).height,
@@ -120,30 +124,34 @@ void main() {
     expect(find.text('14%'), findsOneWidget);
 
     final instagramLeftBefore = GalleryLayoutStore.instance
-        .layoutFor('japan')
+        .layoutFor('spain-2026')
         .instagramPosts
         .first
         .left;
     await tester.tap(
-      find.byKey(const ValueKey('admin-item-selector-japan-null')),
+      find.byKey(const ValueKey('admin-item-selector-spain-2026-null')),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Instagram post 1').last);
+    await tester.tap(find.text('Video 1').last);
     await tester.pumpAndSettle();
-    expect(find.text('JAPAN REEL'), findsOneWidget);
-    expect(find.text('Instagram post 1'), findsWidgets);
+    expect(find.text('SPAIN 2026 VIDEO'), findsOneWidget);
+    expect(find.text('Video 1'), findsWidgets);
     await tester.drag(
       find.byKey(const ValueKey('admin-instagram-instagram-0')),
       const Offset(14, 0),
     );
     await tester.pump();
     expect(
-      GalleryLayoutStore.instance.layoutFor('japan').instagramPosts.first.left,
+      GalleryLayoutStore.instance
+          .layoutFor('spain-2026')
+          .instagramPosts
+          .first
+          .left,
       greaterThan(instagramLeftBefore),
     );
 
     final menuLeftBefore = GalleryLayoutStore.instance
-        .layoutFor('japan')
+        .layoutFor('spain-2026')
         .foodMenu
         .left;
     await tester.tap(find.byKey(const ValueKey('admin-gallery-food-menu')));
@@ -155,7 +163,7 @@ void main() {
     );
     await tester.pump();
     expect(
-      GalleryLayoutStore.instance.layoutFor('japan').foodMenu.left,
+      GalleryLayoutStore.instance.layoutFor('spain-2026').foodMenu.left,
       greaterThan(menuLeftBefore),
     );
 
@@ -173,7 +181,7 @@ void main() {
     await tester.tap(find.text('Horizontal oval').last);
     await tester.pumpAndSettle();
     final horizontalFrame = GalleryLayoutStore.instance
-        .layoutFor('japan')
+        .layoutFor('spain-2026')
         .frames
         .first;
     expect(horizontalFrame.style, GalleryFrameStyle.horizontalOval);
@@ -193,16 +201,16 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pump();
     expect(
-      GalleryLayoutStore.instance.layoutFor('japan').frames.first.title,
+      GalleryLayoutStore.instance.layoutFor('spain-2026').frames.first.title,
       'Tokyo nights',
     );
 
     final frameBeforePhotoEdit = GalleryLayoutStore.instance
-        .layoutFor('japan')
+        .layoutFor('spain-2026')
         .frames
         .first;
     final japanTrip = tripGalleryItems.firstWhere(
-      (trip) => trip.slug == 'japan',
+      (trip) => trip.slug == 'spain-2026',
     );
     final allPhotoChoices = galleryPhotoChoicesFor(japanTrip);
     final appliedPhotoPaths = defaultGalleryMediaFor(
@@ -274,7 +282,7 @@ void main() {
     await tester.tap(find.text('Apply photos'));
     await tester.pumpAndSettle();
     final editedPhotos = GalleryLayoutStore.instance
-        .layoutFor('japan')
+        .layoutFor('spain-2026')
         .frames
         .first
         .effectivePhotoEdits;
@@ -290,7 +298,7 @@ void main() {
     );
 
     final before = GalleryLayoutStore.instance
-        .layoutFor('japan')
+        .layoutFor('spain-2026')
         .frames
         .first
         .left;
@@ -300,22 +308,22 @@ void main() {
     );
     await tester.pump();
     expect(
-      GalleryLayoutStore.instance.layoutFor('japan').frames.first.left,
+      GalleryLayoutStore.instance.layoutFor('spain-2026').frames.first.left,
       greaterThan(before),
     );
     expect(find.byKey(const ValueKey('admin-save-layout')), findsOneWidget);
   });
 
-  testWidgets('gallery uses a frame title and selected photo override', (
+  galleryTest('gallery uses a frame title and selected photo override', (
     tester,
   ) async {
     final store = GalleryLayoutStore.instance;
-    addTearDown(() => store.resetTrip('japan'));
+    addTearDown(() => store.resetTrip('spain-2026'));
     final trip = tripGalleryItems.first;
-    final frame = store.layoutFor('japan').frames.first;
+    final frame = store.layoutFor('spain-2026').frames.first;
     final photoPath = galleryPhotoChoicesFor(trip).last;
     store.updateFrame(
-      'japan',
+      'spain-2026',
       frame.copyWith(
         title: 'Tokyo nights',
         photoAssetPaths: <String>[photoPath],
@@ -330,7 +338,7 @@ void main() {
       ),
     );
     store.updateTravelDates(
-      'japan',
+      'spain-2026',
       start: DateTime(2025, 1, 2),
       end: DateTime(2025, 1, 5),
     );
@@ -340,11 +348,7 @@ void main() {
         home: SizedBox(
           width: 1280,
           height: 800,
-          child: TripJourney(
-            trip: trip,
-            animation: const AlwaysStoppedAnimation<double>(1),
-            onTasteTap: () async {},
-          ),
+          child: TripJourney(trip: trip, onTasteTap: () async {}),
         ),
       ),
     );
@@ -353,11 +357,20 @@ void main() {
     expect(find.text('TOKYO NIGHTS'), findsNWidgets(2));
     expect(find.text('JAN 02, 2025  →  JAN 05, 2025'), findsNWidgets(2));
     expect(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is Image &&
-            widget.image is AssetImage &&
-            (widget.image as AssetImage).assetName == photoPath,
+      find.descendant(
+        of: find.byWidgetPredicate(
+          (widget) =>
+              widget.key is ValueKey<String> &&
+              (widget.key! as ValueKey<String>).value.startsWith(
+                'gallery-memory-layout-spain-2026-0-',
+              ),
+        ),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Image &&
+              widget.image is AssetImage &&
+              (widget.image as AssetImage).assetName == photoPath,
+        ),
       ),
       findsNWidgets(2),
     );
@@ -381,11 +394,11 @@ void main() {
     );
   });
 
-  testWidgets('admin edits the trip travel dates', (tester) async {
+  galleryTest('admin edits the trip travel dates', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1280, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final store = GalleryLayoutStore.instance;
-    addTearDown(() => store.resetTrip('japan'));
+    addTearDown(() => store.resetTrip('spain-2026'));
 
     await tester.pumpWidget(const MaterialApp(home: GalleryAdminScreen()));
     await tester.pump();
@@ -402,13 +415,13 @@ void main() {
     await tester.pumpAndSettle();
 
     store.updateTravelDates(
-      'japan',
+      'spain-2026',
       start: DateTime(2025, 1, 2),
       end: DateTime(2025, 1, 5),
     );
     await tester.pump();
 
-    final layout = store.layoutFor('japan');
+    final layout = store.layoutFor('spain-2026');
     expect(
       layout.effectiveDateRangeLabel('fallback'),
       'JAN 02, 2025  →  JAN 05, 2025',
@@ -417,14 +430,14 @@ void main() {
     expect(find.text('JAN 02, 2025  →  JAN 05, 2025'), findsOneWidget);
   });
 
-  testWidgets('admin adds multi-photo frames and bundled trinkets', (
+  galleryTest('admin adds multi-photo frames and bundled trinkets', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1280, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final store = GalleryLayoutStore.instance;
-    addTearDown(() => store.resetTrip('japan'));
-    final initialLayout = store.layoutFor('japan');
+    addTearDown(() => store.resetTrip('spain-2026'));
+    final initialLayout = store.layoutFor('spain-2026');
 
     await tester.pumpWidget(const MaterialApp(home: GalleryAdminScreen()));
     await tester.pump();
@@ -443,7 +456,7 @@ void main() {
     await tester.tap(find.text('Apply photos'));
     await tester.pumpAndSettle();
 
-    final layoutWithFrame = store.layoutFor('japan');
+    final layoutWithFrame = store.layoutFor('spain-2026');
     expect(layoutWithFrame.frames, hasLength(initialLayout.frames.length + 1));
     expect(layoutWithFrame.frames.last.isCustom, isTrue);
     expect(layoutWithFrame.frames.last.effectivePhotoEdits, hasLength(2));
@@ -466,7 +479,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('admin-trinket-choice-0')));
     await tester.pumpAndSettle();
 
-    final layoutWithTrinket = store.layoutFor('japan');
+    final layoutWithTrinket = store.layoutFor('spain-2026');
     expect(
       layoutWithTrinket.trinkets,
       hasLength(initialLayout.trinkets.length + 1),
@@ -517,7 +530,7 @@ void main() {
 
   test('default horizontal ovals match the generated artwork ratio', () {
     final horizontalFrames = defaultGalleryLayoutFor(
-      'japan',
+      'spain-2026',
     ).frames.where((frame) => frame.style == GalleryFrameStyle.horizontalOval);
 
     expect(horizontalFrames, isNotEmpty);
@@ -536,7 +549,7 @@ void main() {
 
   test('default circular frames are square and use the circular artwork', () {
     final circularFrames = defaultGalleryLayoutFor(
-      'japan',
+      'spain-2026',
     ).frames.where((frame) => frame.style == GalleryFrameStyle.circular);
 
     expect(circularFrames, isNotEmpty);
@@ -554,7 +567,7 @@ void main() {
   });
 
   test('locked frame resizing preserves its current aspect ratio', () {
-    final frame = defaultGalleryLayoutFor('japan').frames.first;
+    final frame = defaultGalleryLayoutFor('spain-2026').frames.first;
     final resized = frame.resized(width: 380);
 
     expect(frame.lockAspectRatio, isTrue);
@@ -566,7 +579,7 @@ void main() {
     expect(unlocked.height, frame.height);
   });
 
-  test('older saved Japan layouts gain default Instagram placements', () {
+  test('legacy saved video layouts migrate without losing placement edits', () {
     final json = <String, dynamic>{
       'frames': <Map<String, Object?>>[
         GalleryFramePlacement(
@@ -583,13 +596,44 @@ void main() {
       ],
       'trinkets': <Map<String, Object>>[],
       'stripWidth': 9180,
-      'foodMenu': defaultFoodMenuPlacementFor('japan').toJson(),
+      'foodMenu': defaultFoodMenuPlacementFor(
+        'spain-2026',
+      ).copyWith(left: 780).toJson(),
+      'instagramPosts': <Map<String, Object>>[
+        for (final (index, left, style) in <(int, double, GalleryFrameStyle)>[
+          (0, 470, GalleryFrameStyle.oval),
+          (1, 1545, GalleryFrameStyle.portrait),
+          (2, 2255, GalleryFrameStyle.horizontalOval),
+          (3, 3335, GalleryFrameStyle.circular),
+          (4, 4455, GalleryFrameStyle.portrait),
+          (5, 5970, GalleryFrameStyle.horizontalOval),
+          (6, 7295, GalleryFrameStyle.circular),
+        ])
+          GalleryInstagramPlacement(
+            id: 'instagram-$index',
+            postIndex: index,
+            left: left,
+            top:
+                style == GalleryFrameStyle.oval ||
+                    style == GalleryFrameStyle.portrait
+                ? 205
+                : 269,
+            width: style == GalleryFrameStyle.horizontalOval ? 400 : 272,
+            height:
+                style == GalleryFrameStyle.oval ||
+                    style == GalleryFrameStyle.portrait
+                ? 400
+                : 272,
+            style: style,
+            angle: 0,
+          ).toJson(),
+      ],
     };
 
     final migrated = GalleryTripLayout.fromJson(
       json,
-      tripSlug: 'japan',
-      fallbackStripWidth: defaultGalleryStripWidthFor('japan'),
+      tripSlug: 'spain-2026',
+      fallbackStripWidth: defaultGalleryStripWidthFor('spain-2026'),
     );
 
     expect(migrated.instagramPosts, hasLength(7));
@@ -612,7 +656,9 @@ void main() {
 
   test('social media frames are level in defaults and saved layouts', () {
     expect(
-      defaultGalleryLayoutFor('japan').instagramPosts.map((post) => post.angle),
+      defaultGalleryLayoutFor(
+        'spain-2026',
+      ).instagramPosts.map((post) => post.angle),
       everyElement(0),
     );
 
@@ -632,13 +678,13 @@ void main() {
 
   test('travel date overrides survive saved layout serialization', () {
     final datedLayout = defaultGalleryLayoutFor(
-      'japan',
+      'spain-2026',
     ).copyWith(travelStartDate: '2025-01-02', travelEndDate: '2025-01-05');
 
     final restored = GalleryTripLayout.fromJson(
       datedLayout.toJson(),
-      tripSlug: 'japan',
-      fallbackStripWidth: defaultGalleryStripWidthFor('japan'),
+      tripSlug: 'spain-2026',
+      fallbackStripWidth: defaultGalleryStripWidthFor('spain-2026'),
     );
 
     expect(restored.travelStartDate, '2025-01-02');
@@ -646,7 +692,7 @@ void main() {
     expect(restored.effectiveDurationLabel(12), '4 DAYS');
   });
 
-  testWidgets('previously embedded trinket data remains readable', (
+  galleryTest('previously embedded trinket data remains readable', (
     tester,
   ) async {
     const onePixelPng =
