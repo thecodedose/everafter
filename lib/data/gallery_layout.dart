@@ -12,6 +12,15 @@ const double circularFrameAspectRatio = 1;
 const double featuredCircularFrameSize = 220;
 
 const double galleryEditorialTitleLeft = 4348;
+const double landscapeApertureWidth = 0.7336;
+const double landscapeApertureHeight = 0.6667;
+const double portraitApertureWidth = 0.5408;
+const double portraitApertureHeight = 0.6755;
+
+double photoFrameAspectRatio(double photoAspectRatio, {required bool landscape}) =>
+    photoAspectRatio * (landscape
+        ? landscapeApertureHeight / landscapeApertureWidth
+        : portraitApertureHeight / portraitApertureWidth);
 
 @immutable
 class GalleryPhotoEdit {
@@ -337,62 +346,6 @@ class GalleryTrinketPlacement {
 }
 
 @immutable
-class GalleryDecorationPlacement {
-  const GalleryDecorationPlacement({
-    required this.id,
-    required this.left,
-    required this.top,
-    required this.width,
-    required this.height,
-    this.angle = 0,
-  });
-
-  final String id;
-  final double left;
-  final double top;
-  final double width;
-  final double height;
-  final double angle;
-
-  GalleryDecorationPlacement copyWith({
-    double? left,
-    double? top,
-    double? width,
-    double? height,
-    double? angle,
-  }) {
-    return GalleryDecorationPlacement(
-      id: id,
-      left: left ?? this.left,
-      top: top ?? this.top,
-      width: width ?? this.width,
-      height: height ?? this.height,
-      angle: angle ?? this.angle,
-    );
-  }
-
-  Map<String, Object> toJson() => <String, Object>{
-    'id': id,
-    'left': left,
-    'top': top,
-    'width': width,
-    'height': height,
-    'angle': angle,
-  };
-
-  factory GalleryDecorationPlacement.fromJson(Map<String, dynamic> json) {
-    return GalleryDecorationPlacement(
-      id: json['id'] as String,
-      left: (json['left'] as num).toDouble(),
-      top: (json['top'] as num).toDouble(),
-      width: (json['width'] as num).toDouble(),
-      height: (json['height'] as num).toDouble(),
-      angle: (json['angle'] as num?)?.toDouble() ?? 0,
-    );
-  }
-}
-
-@immutable
 class GalleryInstagramPlacement {
   const GalleryInstagramPlacement({
     required this.id,
@@ -478,22 +431,24 @@ class GalleryTripLayout {
     required this.trinkets,
     required this.instagramPosts,
     required this.stripWidth,
-    required this.foodMenu,
     this.leadingTrim = 0,
     this.travelStartDate,
     this.travelEndDate,
     this.layoutVersion = 2,
+    this.mediaLayoutVersion = 0,
+    this.editorialTitleLeft = galleryEditorialTitleLeft,
   });
 
   final List<GalleryFramePlacement> frames;
   final List<GalleryTrinketPlacement> trinkets;
   final List<GalleryInstagramPlacement> instagramPosts;
   final double stripWidth;
-  final GalleryDecorationPlacement foodMenu;
   final double leadingTrim;
   final String? travelStartDate;
   final String? travelEndDate;
   final int layoutVersion;
+  final int mediaLayoutVersion;
+  final double editorialTitleLeft;
 
   DateTime? get travelStart => DateTime.tryParse(travelStartDate ?? '');
   DateTime? get travelEnd => DateTime.tryParse(travelEndDate ?? '');
@@ -531,11 +486,12 @@ class GalleryTripLayout {
     List<GalleryTrinketPlacement>? trinkets,
     List<GalleryInstagramPlacement>? instagramPosts,
     double? stripWidth,
-    GalleryDecorationPlacement? foodMenu,
     double? leadingTrim,
     String? travelStartDate,
     String? travelEndDate,
     int? layoutVersion,
+    int? mediaLayoutVersion,
+    double? editorialTitleLeft,
     bool clearTravelDates = false,
   }) {
     return GalleryTripLayout(
@@ -543,7 +499,6 @@ class GalleryTripLayout {
       trinkets: trinkets ?? this.trinkets,
       instagramPosts: instagramPosts ?? this.instagramPosts,
       stripWidth: stripWidth ?? this.stripWidth,
-      foodMenu: foodMenu ?? this.foodMenu,
       leadingTrim: leadingTrim ?? this.leadingTrim,
       travelStartDate: clearTravelDates
           ? null
@@ -552,6 +507,8 @@ class GalleryTripLayout {
           ? null
           : travelEndDate ?? this.travelEndDate,
       layoutVersion: layoutVersion ?? this.layoutVersion,
+      mediaLayoutVersion: mediaLayoutVersion ?? this.mediaLayoutVersion,
+      editorialTitleLeft: editorialTitleLeft ?? this.editorialTitleLeft,
     );
   }
 
@@ -560,11 +517,12 @@ class GalleryTripLayout {
     'trinkets': trinkets.map((trinket) => trinket.toJson()).toList(),
     'instagramPosts': instagramPosts.map((post) => post.toJson()).toList(),
     'stripWidth': stripWidth,
-    'foodMenu': foodMenu.toJson(),
     'leadingTrim': leadingTrim,
     'travelStartDate': travelStartDate,
     'travelEndDate': travelEndDate,
     'layoutVersion': layoutVersion,
+    'mediaLayoutVersion': mediaLayoutVersion,
+    'editorialTitleLeft': editorialTitleLeft,
   };
 
   factory GalleryTripLayout.fromJson(
@@ -597,16 +555,13 @@ class GalleryTripLayout {
               )
               .toList() ??
           defaultInstagramPlacementsFor(tripSlug),
-      foodMenu: switch (json['foodMenu']) {
-        final Map<String, dynamic> value => GalleryDecorationPlacement.fromJson(
-          value,
-        ),
-        _ => defaultFoodMenuPlacementFor(tripSlug),
-      },
       leadingTrim: (json['leadingTrim'] as num?)?.toDouble() ?? 0,
       travelStartDate: json['travelStartDate'] as String?,
       travelEndDate: json['travelEndDate'] as String?,
       layoutVersion: (json['layoutVersion'] as num?)?.toInt() ?? 1,
+      mediaLayoutVersion: (json['mediaLayoutVersion'] as num?)?.toInt() ?? 0,
+      editorialTitleLeft:
+          (json['editorialTitleLeft'] as num?)?.toDouble() ?? galleryEditorialTitleLeft,
     );
     final instagramUpgraded = layout.layoutVersion < 2
         ? _upgradeVideoPostFrameScale(layout)
@@ -651,9 +606,6 @@ GalleryTripLayout _upgradeVideoPostFrameScale(GalleryTripLayout layout) {
         ),
     ],
     stripWidth: layout.stripWidth + totalAddedWidth,
-    foodMenu: layout.foodMenu.copyWith(
-      left: layout.foodMenu.left + shiftBefore(layout.foodMenu.left),
-    ),
     layoutVersion: 2,
   );
 }
@@ -763,9 +715,6 @@ GalleryTripLayout _upgradeFeaturedCircularFrameSize(GalleryTripLayout layout) {
       for (final post in layout.instagramPosts)
         post.copyWith(left: post.left + reflowOffset(post.left)),
     ],
-    foodMenu: layout.foodMenu.copyWith(
-      left: layout.foodMenu.left + reflowOffset(layout.foodMenu.left),
-    ),
     stripWidth: layout.stripWidth + (reflowVideoWall ? 235 : 0),
     layoutVersion: 4,
   );
@@ -796,6 +745,27 @@ class GalleryLayoutStore extends ChangeNotifier {
   Future<void> load() async {
     await _loadBundledGlobalLayouts();
     _layouts = Map<String, GalleryTripLayout>.of(_bundledLayouts);
+    _hasUnsavedChanges = false;
+    notifyListeners();
+  }
+
+  /// Establish a reset/export baseline with one distinct photo in each frame.
+  /// Called once after the asset manifest and saved layout are loaded.
+  void bindTripMedia(
+    Map<String, List<String>> photosByTrip, {
+    Map<String, int> videoCountsByTrip = const <String, int>{},
+    Map<String, double> photoAspectRatios = const <String, double>{},
+  }) {
+    for (final entry in photosByTrip.entries) {
+      final layout = singlePhotoLayoutFor(
+        layoutFor(entry.key),
+        entry.value,
+        videoCount: videoCountsByTrip[entry.key] ?? 0,
+        photoAspectRatios: photoAspectRatios,
+      );
+      _layouts[entry.key] = layout;
+      _bundledLayouts[entry.key] = layout;
+    }
     _hasUnsavedChanges = false;
     notifyListeners();
   }
@@ -910,15 +880,6 @@ class GalleryLayoutStore extends ChangeNotifier {
     _markChanged();
   }
 
-  void updateFoodMenu(String tripSlug, GalleryDecorationPlacement foodMenu) {
-    final layout = layoutFor(tripSlug);
-    _layouts = <String, GalleryTripLayout>{
-      ..._layouts,
-      tripSlug: layout.copyWith(foodMenu: foodMenu),
-    };
-    _markChanged();
-  }
-
   void updateInstagramPost(
     String tripSlug,
     GalleryInstagramPlacement instagramPost,
@@ -959,13 +920,8 @@ class GalleryLayoutStore extends ChangeNotifier {
   void fitTripToContents(String tripSlug) {
     final layout = layoutFor(tripSlug);
     const gutter = 50.0;
-    var leftEdge = galleryEditorialTitleLeft;
+    var leftEdge = layout.editorialTitleLeft;
     var rightEdge = leftEdge + 340;
-    leftEdge = math.min(leftEdge, layout.foodMenu.left);
-    rightEdge = math.max(
-      rightEdge,
-      layout.foodMenu.left + layout.foodMenu.width,
-    );
     for (final frame in layout.frames.where((item) => item.visible)) {
       final renderedWidth = frame.width * 2.3 * frame.scale;
       leftEdge = math.min(
@@ -1039,6 +995,202 @@ class GalleryLayoutStore extends ChangeNotifier {
     }
     return '$prefix-$index';
   }
+}
+
+/// Reuse existing frame styles/positions, then extend the same wall for extra
+/// media. Explicit single-photo crops survive; multi-photo selections become
+/// separate frames instead of a slideshow. No source JSON is overwritten.
+GalleryTripLayout singlePhotoLayoutFor(
+  GalleryTripLayout layout,
+  List<String> photoPaths, {
+  int videoCount = 0,
+  Map<String, double> photoAspectRatios = const <String, double>{},
+}) {
+  final photos = photoPaths.toSet().toList(growable: false);
+  final templates = layout.frames.isNotEmpty
+      ? layout.frames
+      : defaultGalleryLayoutFor('spain-2026').frames;
+  final unassigned = layout.frames
+      .where((frame) => frame.effectivePhotoEdits.isEmpty)
+      .toList();
+  final usedIds = <String>{};
+  var cursor = layout.stripWidth + layout.leadingTrim;
+  final frames = <GalleryFramePlacement>[];
+  for (var index = 0; index < photos.length; index++) {
+    final path = photos[index];
+    GalleryFramePlacement? original;
+    GalleryPhotoEdit? crop;
+    for (final frame in layout.frames) {
+      if (usedIds.contains(frame.id)) continue;
+      final matching = frame.effectivePhotoEdits
+          .where((edit) => edit.assetPath == path)
+          .firstOrNull;
+      if (matching != null) {
+        original = frame;
+        crop = matching;
+        break;
+      }
+    }
+    if (original == null && unassigned.isNotEmpty) {
+      original = unassigned.removeAt(0);
+    }
+    if (original != null) {
+      crop ??= GalleryPhotoEdit(
+        assetPath: path,
+        alignmentX: original.alignmentX,
+        alignmentY: original.alignmentY,
+      );
+      usedIds.add(original.id);
+      frames.add(original.copyWith(
+        photoAssetPaths: <String>[path],
+        photoEdits: <GalleryPhotoEdit>[crop],
+      ));
+      continue;
+    }
+    var template = templates[index % templates.length];
+    final aspectRatio = photoAspectRatios[path];
+    if (aspectRatio != null) {
+      final landscape = aspectRatio >= 1;
+      final height = landscape ? 181.0 : 254.0;
+      template = template.copyWith(
+        width: height * photoFrameAspectRatio(aspectRatio, landscape: landscape),
+        height: height,
+        top: 405 - height / 2,
+        style: landscape ? GalleryFrameStyle.landscape : GalleryFrameStyle.portrait,
+        portrait: !landscape,
+        scale: 560 / (2.3 * height),
+        angle: 0,
+      );
+    }
+    var id = 'auto-photo-$index';
+    while (usedIds.contains(id) || layout.frames.any((frame) => frame.id == id)) {
+      id = '$id-extra';
+    }
+    final renderedWidth = template.width * 2.3 * template.scale;
+    frames.add(GalleryFramePlacement(
+      id: id,
+      memoryIndex: index,
+      left: cursor + (renderedWidth - template.width) / 2,
+      top: template.top,
+      width: template.width,
+      height: template.height,
+      style: template.style,
+      alignmentX: template.alignmentX,
+      alignmentY: template.alignmentY,
+      scale: template.scale,
+      angle: template.angle,
+      portrait: template.portrait,
+      photoAssetPaths: <String>[path],
+      photoEdits: <GalleryPhotoEdit>[
+        GalleryPhotoEdit(
+          assetPath: path,
+          alignmentX: template.alignmentX,
+          alignmentY: template.alignmentY,
+        ),
+      ],
+    ));
+    usedIds.add(id);
+    cursor += renderedWidth + 80;
+  }
+  final videoTemplates = layout.instagramPosts.isNotEmpty
+      ? layout.instagramPosts
+      : defaultInstagramPlacementsFor('spain-2026');
+  final posts = <GalleryInstagramPlacement>[];
+  for (var index = 0; index < videoCount; index++) {
+    if (index < layout.instagramPosts.length) {
+      posts.add(layout.instagramPosts[index]);
+      continue;
+    }
+    final template = videoTemplates[index % videoTemplates.length];
+    final renderedWidth = template.width * template.scale;
+    posts.add(GalleryInstagramPlacement(
+      id: 'auto-video-$index',
+      postIndex: index,
+      left: cursor + (renderedWidth - template.width) / 2,
+      top: template.top,
+      width: template.width,
+      height: template.height,
+      style: template.style,
+      scale: template.scale,
+      angle: 0,
+    ));
+    cursor += renderedWidth + 80;
+  }
+  var rightEdge = layout.editorialTitleLeft + 340;
+  for (final frame in frames) {
+    final renderedWidth = frame.width * 2.3 * frame.scale;
+    rightEdge = math.max(rightEdge, frame.left + (renderedWidth + frame.width) / 2);
+  }
+  for (final post in posts) {
+    final renderedWidth = post.width * post.scale;
+    rightEdge = math.max(rightEdge, post.left + (renderedWidth + post.width) / 2);
+  }
+  for (final trinket in layout.trinkets) {
+    rightEdge = math.max(rightEdge, trinket.left + trinket.width);
+  }
+  final bound = layout.copyWith(
+    frames: frames,
+    instagramPosts: posts,
+    stripWidth: math.max(layout.stripWidth, rightEdge - layout.leadingTrim + 80),
+  );
+  // Reflow the old demonstration layout once. An exported layout carries the
+  // marker so later editor positioning, sizing and spacing remain editable.
+  if (layout.mediaLayoutVersion >= 2) return bound;
+  const gap = 80.0;
+  const renderedHeight = 560.0;
+  const titleLeft = 72.0;
+  var nextLeft = titleLeft + 340 + gap;
+  final orientedFrames = <GalleryFramePlacement>[];
+  for (final frame in bound.frames) {
+    final path = frame.effectivePhotoEdits.single.assetPath;
+    final aspectRatio = photoAspectRatios[path];
+    final landscape = aspectRatio != null
+        ? aspectRatio >= 1
+        : frame.width >= frame.height;
+    final height = landscape ? 181.0 : 254.0;
+    final width = aspectRatio == null
+        ? (landscape ? 226.0 : 178.0)
+        : height * photoFrameAspectRatio(aspectRatio, landscape: landscape);
+    final scale = renderedHeight / (2.3 * height);
+    final renderedWidth = width * 2.3 * scale;
+    orientedFrames.add(frame.copyWith(
+      left: nextLeft + (renderedWidth - width) / 2,
+      top: 405 - height / 2,
+      width: width,
+      height: height,
+      scale: scale,
+      style: landscape ? GalleryFrameStyle.landscape : GalleryFrameStyle.portrait,
+      portrait: !landscape,
+      angle: 0,
+    ));
+    nextLeft += renderedWidth + gap;
+  }
+  final videoPlacements = <GalleryInstagramPlacement>[];
+  for (final post in bound.instagramPosts) {
+    final scale = renderedHeight / post.height;
+    final renderedWidth = post.width * scale;
+    videoPlacements.add(post.copyWith(
+      left: nextLeft + (renderedWidth - post.width) / 2,
+      top: 405 - post.height / 2,
+      scale: scale,
+      angle: 0,
+    ));
+    nextLeft += renderedWidth + gap;
+  }
+  final trinkets = <GalleryTrinketPlacement>[];
+  for (final trinket in bound.trinkets) {
+    trinkets.add(trinket.copyWith(left: nextLeft));
+    nextLeft += trinket.width + gap;
+  }
+  return bound.copyWith(
+    frames: orientedFrames,
+    instagramPosts: videoPlacements,
+    trinkets: trinkets,
+    editorialTitleLeft: titleLeft,
+    leadingTrim: 0,
+    stripWidth: nextLeft - gap + 80,
+    mediaLayoutVersion: 2,
+  );
 }
 
 Map<String, GalleryTripLayout> decodeGlobalGalleryLayoutDocument(
@@ -1411,14 +1563,6 @@ const Map<String, dynamic> _galleryWallTemplate = {
     },
   ],
   "stripWidth": 10495.0,
-  "foodMenu": {
-    "id": "food-menu",
-    "left": 916.0,
-    "top": 322.0,
-    "width": 250.0,
-    "height": 166.0,
-    "angle": 0.0,
-  },
   "leadingTrim": 0.0,
   "travelStartDate": null,
   "travelEndDate": null,
@@ -1441,11 +1585,6 @@ List<GalleryInstagramPlacement> defaultInstagramPlacementsFor(
 
 double defaultGalleryStripWidthFor(String tripSlug) =>
     (_galleryWallTemplate['stripWidth'] as num).toDouble();
-
-GalleryDecorationPlacement defaultFoodMenuPlacementFor(String tripSlug) =>
-    GalleryDecorationPlacement.fromJson(
-      Map<String, dynamic>.from(_galleryWallTemplate['foodMenu'] as Map),
-    );
 
 String formatGalleryTravelDate(DateTime date) {
   const months = <String>[

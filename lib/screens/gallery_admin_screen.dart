@@ -5,6 +5,7 @@ import 'package:everafter/data/gallery_memory_content.dart';
 import 'package:everafter/theme/everafter_theme.dart';
 import 'package:everafter/widgets/gallery_trinket_image.dart';
 import 'package:everafter/data/trip_catalog.dart';
+import 'package:everafter/data/photo_metadata.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -111,7 +112,7 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
         crossAxisAlignment: WrapCrossAlignment.center,
         children: <Widget>[
           IconButton(
-            tooltip: 'Back to EverAfter',
+            tooltip: 'Back to Trip Highlights',
             onPressed: () => context.go('/'),
             icon: const Icon(Icons.arrow_back),
           ),
@@ -133,7 +134,7 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
               dropdownColor: const Color(0xFF352520),
               decoration: _fieldDecoration('Trip'),
               items: <DropdownMenuItem<String>>[
-                for (final trip in tripGalleryItems)
+                for (final trip in tripGalleryItemsByYear)
                   DropdownMenuItem(value: trip.slug, child: Text(trip.name)),
               ],
               onChanged: (slug) {
@@ -246,7 +247,7 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
                           value: _AddGalleryItemType.frame,
                           child: ListTile(
                             leading: Icon(Icons.filter_frames_outlined),
-                            title: Text('Frame with photos'),
+                            title: Text('Frame with photo'),
                           ),
                         ),
                         PopupMenuItem(
@@ -337,7 +338,6 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
                         for (final instagramPost in layout.instagramPosts)
                           if (instagramPost.visible)
                             _buildInstagramPost(instagramPost),
-                        _buildFoodMenu(),
                         _buildEditorialTitle(),
                       ],
                     ),
@@ -647,7 +647,7 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
                     'To add more trinkets, place PNG, JPEG, or WebP files in '
                     'assets/images/experience/, add their asset paths to '
                     'galleryTrinketAssetChoices in '
-                    'lib/data/gallery_memory_content.dart, then rebuild EverAfter.',
+                    'lib/data/gallery_memory_content.dart, then rebuild Trip Highlights.',
                     style: TextStyle(color: Color(0xFFD4BFAF), height: 1.35),
                   ),
                 ),
@@ -674,151 +674,9 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
     });
   }
 
-  Widget _buildFoodMenu() {
-    final placement = _store.layoutFor(_tripSlug).foodMenu;
-    final selected =
-        _selection ==
-        _SelectedGalleryItem(_GalleryItemType.foodMenu, placement.id);
-    return Positioned(
-      key: const ValueKey('admin-gallery-food-menu'),
-      left: (placement.left - _leadingTrim) * _canvasScale,
-      top: placement.top * _canvasScale,
-      width: placement.width * _canvasScale,
-      height: placement.height * _canvasScale,
-      child: Listener(
-        onPointerMove: (event) {
-          if (event.buttons == 0) return;
-          _store.updateFoodMenu(
-            _tripSlug,
-            placement.copyWith(
-              left: placement.left + event.delta.dx / _canvasScale,
-              top: placement.top + event.delta.dy / _canvasScale,
-            ),
-          );
-        },
-        child: GestureDetector(
-          onTap: () => setState(
-            () => _selection = _SelectedGalleryItem(
-              _GalleryItemType.foodMenu,
-              placement.id,
-            ),
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: selected ? const Color(0xFFFFE3A6) : Colors.transparent,
-                width: selected ? 3 : 0,
-              ),
-            ),
-            child: Transform.rotate(
-              angle: -0.018 + placement.angle,
-              child: FittedBox(
-                fit: BoxFit.fill,
-                child: SizedBox(
-                  width: 250,
-                  height: 166,
-                  child: DecoratedBox(
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF080807),
-                      boxShadow: <BoxShadow>[
-                        BoxShadow(
-                          color: Color(0xB3000000),
-                          blurRadius: 16,
-                          offset: Offset(5, 8),
-                        ),
-                      ],
-                    ),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: <Widget>[
-                        Image.asset(
-                          'assets/images/taste/lace_menu_frame.png',
-                          fit: BoxFit.fill,
-                          filterQuality: FilterQuality.high,
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(
-                            32.5,
-                            33.2,
-                            32.5,
-                            30,
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: <Widget>[
-                              Text(
-                                'EVERAFTER · MENU '
-                                '${_trip.number.toString().padLeft(2, '0')}',
-                                maxLines: 1,
-                                style: const TextStyle(
-                                  fontFamily: 'Georgia',
-                                  color: Color(0xFF755B3D),
-                                  fontSize: 6.5,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.2,
-                                  decoration: TextDecoration.none,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Expanded(
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text(
-                                    'TASTE OF ${_trip.name.toUpperCase()}',
-                                    maxLines: 1,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontFamily: 'Georgia',
-                                      color: Color(0xFF2A2520),
-                                      fontSize: 25,
-                                      height: 1,
-                                      letterSpacing: 1.5,
-                                      decoration: TextDecoration.none,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                _trip.location.substring(0, 1).toUpperCase(),
-                                style: const TextStyle(
-                                  fontFamily: 'Georgia',
-                                  color: Color(0xFF755B3D),
-                                  fontSize: 6.5,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1,
-                                  decoration: TextDecoration.none,
-                                ),
-                              ),
-                              const SizedBox(height: 7),
-                              const Text(
-                                'TAP TO OPEN',
-                                style: TextStyle(
-                                  fontFamily: 'Georgia',
-                                  color: Color(0xFF2A2520),
-                                  fontSize: 6.5,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.4,
-                                  decoration: TextDecoration.none,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildEditorialTitle() {
-    const left = galleryEditorialTitleLeft;
+    final left = _store.layoutFor(_tripSlug).editorialTitleLeft;
     final dateRangeLabel = _store
         .layoutFor(_tripSlug)
         .effectiveDateRangeLabel(_trip.dateRangeLabel);
@@ -1244,12 +1102,6 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
                         '${instagramPost.visible ? '' : ' (hidden)'}',
                       ),
                     ),
-                  DropdownMenuItem(
-                    value:
-                        '${_GalleryItemType.foodMenu.name}:'
-                        '${layout.foodMenu.id}',
-                    child: const Text('Food menu'),
-                  ),
                 ],
                 onChanged: (value) {
                   if (value == null) return;
@@ -1288,7 +1140,7 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
           ? _emptyInspector()
           : _instagramInspector(instagramPost.first);
     } else {
-      detail = _foodMenuInspector(layout.foodMenu);
+      detail = _emptyInspector();
     }
     return Column(
       children: <Widget>[
@@ -1533,9 +1385,9 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
     );
     final edits = <String, GalleryPhotoEdit>{
       if (frame.effectivePhotoEdits.isNotEmpty)
-        for (final edit in frame.effectivePhotoEdits) edit.assetPath: edit
+        for (final edit in frame.effectivePhotoEdits.take(1)) edit.assetPath: edit
       else if (!frame.isCustom)
-        for (final media in originalMedia)
+        for (final media in originalMedia.take(1))
           if (!media.isVideo)
             media.assetPath: GalleryPhotoEdit(
               assetPath: media.assetPath,
@@ -1556,14 +1408,14 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
             contentPadding: const EdgeInsets.all(16),
             key: const ValueKey('admin-photo-picker'),
             backgroundColor: const Color(0xFF251915),
-            title: Text('Photos in frame ${frame.memoryIndex + 1}'),
+            title: Text('Photo in frame ${frame.memoryIndex + 1}'),
             content: SizedBox(
               width: 960,
               height:
                   (MediaQuery.sizeOf(context).height -
                           MediaQuery.viewInsetsOf(context).bottom -
                           200)
-                      .clamp(160.0, 520.0)
+                      .clamp(100.0, 520.0)
                       .toDouble(),
               child: _ResponsivePhotoPicker(
                 crop: KeyedSubtree(
@@ -1627,7 +1479,7 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
                               size: 17,
                             ),
                             label: Text(
-                              showPhotoLibrary ? 'Done adding' : 'Add photos',
+                              showPhotoLibrary ? 'Done choosing' : 'Choose photo',
                             ),
                           ),
                         ],
@@ -1638,7 +1490,7 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
                             ? const Center(
                                 child: Text(
                                   'No photos in this frame yet.\n'
-                                  'Choose Add photos to select some.',
+                                  'Choose a photo for this frame.',
                                   key: ValueKey('admin-empty-frame-photos'),
                                   textAlign: TextAlign.center,
                                   style: TextStyle(color: Color(0xFFB9A69B)),
@@ -1674,6 +1526,7 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
                                     onTap: () {
                                       setDialogState(() {
                                         if (!isSelected) {
+                                          edits.clear();
                                           edits[assetPath] = GalleryPhotoEdit(
                                             assetPath: assetPath,
                                             alignmentX: frame.alignmentX,
@@ -1765,7 +1618,7 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
                   context,
                   const _PhotoSelectionResult(useOriginal: true),
                 ),
-                child: const Text('Use original photos'),
+                child: const Text('Use original photo'),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context),
@@ -1780,7 +1633,7 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
                           photoEdits: edits.values.toList(growable: false),
                         ),
                       ),
-                child: const Text('Apply photos'),
+                child: const Text('Apply photo'),
               ),
             ],
           );
@@ -1788,17 +1641,26 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
       ),
     );
     if (result == null) return;
-    _store.updateFrame(
-      _tripSlug,
-      frame.copyWith(
-        photoAssetPaths: result.useOriginal
-            ? const <String>[]
-            : <String>[for (final edit in result.photoEdits) edit.assetPath],
-        photoEdits: result.useOriginal
-            ? const <GalleryPhotoEdit>[]
-            : result.photoEdits,
-      ),
+    var updated = frame.copyWith(
+      photoAssetPaths: result.useOriginal
+          ? const <String>[]
+          : <String>[for (final edit in result.photoEdits) edit.assetPath],
+      photoEdits: result.useOriginal ? const <GalleryPhotoEdit>[] : result.photoEdits,
     );
+    final selectedPath = result.useOriginal
+        ? originalMedia.firstOrNull?.assetPath
+        : result.photoEdits.firstOrNull?.assetPath;
+    final ratio = galleryPhotoAspectRatios[selectedPath];
+    if (ratio != null && (updated.style == GalleryFrameStyle.landscape ||
+        updated.style == GalleryFrameStyle.portrait)) {
+      final landscape = ratio >= 1;
+      updated = updated.copyWith(
+        width: updated.height * photoFrameAspectRatio(ratio, landscape: landscape),
+        style: landscape ? GalleryFrameStyle.landscape : GalleryFrameStyle.portrait,
+        portrait: !landscape,
+      );
+    }
+    _store.updateFrame(_tripSlug, updated);
   }
 
   Widget _trinketInspector(GalleryTrinketPlacement trinket) {
@@ -1950,44 +1812,6 @@ class _GalleryAdminScreenState extends State<GalleryAdminScreen> {
         false;
   }
 
-  Widget _foodMenuInspector(GalleryDecorationPlacement foodMenu) {
-    return _inspectorShell(
-      title: 'Taste of ${_trip.name}',
-      subtitle: 'Food menu',
-      visible: true,
-      showVisibility: false,
-      onVisibleChanged: (_) {},
-      children: <Widget>[
-        _coordinateFields(
-          left: foodMenu.left,
-          top: foodMenu.top,
-          width: foodMenu.width,
-          height: foodMenu.height,
-          angle: foodMenu.angle,
-          onChanged:
-              ({
-                double? left,
-                double? top,
-                double? width,
-                double? height,
-                double? angle,
-                double? scale,
-              }) {
-                _store.updateFoodMenu(
-                  _tripSlug,
-                  foodMenu.copyWith(
-                    left: left,
-                    top: top,
-                    width: width,
-                    height: height,
-                    angle: angle,
-                  ),
-                );
-              },
-        ),
-      ],
-    );
-  }
 
   Widget _inspectorShell({
     required String title,
@@ -2662,7 +2486,7 @@ class _RemoveCustomItemButton extends StatelessWidget {
   }
 }
 
-enum _GalleryItemType { frame, trinket, instagram, foodMenu }
+enum _GalleryItemType { frame, trinket, instagram }
 
 enum _AddGalleryItemType { frame, trinket }
 

@@ -46,9 +46,6 @@ GalleryVideoPost? galleryVideoPostFor(String tripSlug, int index) {
   return index >= 0 && index < posts.length ? posts[index] : null;
 }
 
-List<TasteMemory> galleryTasteMemoriesFor(String tripSlug) =>
-    tripCollections[tripSlug]?.tastes ?? const <TasteMemory>[];
-
 // Existing bundled decoration choices. These are artwork, not NFC integrations.
 const List<String> galleryTrinketAssetChoices = <String>[
   'assets/images/experience/china-nfc-magnet-reveal.png',

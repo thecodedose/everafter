@@ -64,44 +64,20 @@ class GalleryVideoPost {
   final String videoAssetPath;
 }
 
-class TasteMemory {
-  const TasteMemory({
-    required this.place,
-    required this.city,
-    required this.dish,
-    required this.note,
-    required this.detail,
-    required this.assetPath,
-    required this.accessionNumber,
-  });
-
-  final String place;
-  final String city;
-  final String dish;
-  final String note;
-  final String detail;
-  final String assetPath;
-  final String accessionNumber;
-}
-
 class GalleryTripCollection {
   const GalleryTripCollection({
     this.locations = const <GalleryMemoryLocation>[],
     this.videoPosts = const <GalleryVideoPost>[],
-    this.tastes = const <TasteMemory>[],
   });
 
   final List<GalleryMemoryLocation> locations;
   final List<GalleryVideoPost> videoPosts;
-  final List<TasteMemory> tastes;
 
   GalleryTripCollection copyWith({
     List<GalleryMemoryLocation>? locations,
     List<GalleryVideoPost>? videoPosts,
-    List<TasteMemory>? tastes,
   }) => GalleryTripCollection(
     locations: locations ?? this.locations,
     videoPosts: videoPosts ?? this.videoPosts,
-    tastes: tastes ?? this.tastes,
   );
 }

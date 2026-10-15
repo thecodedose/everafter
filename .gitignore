@@ -12,18 +12,16 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+# IntelliJ
 *.iml
 *.ipr
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
+# Uncomment if you want VS Code settings excluded
 #.vscode/
 
-# Flutter/Dart/Pub related
+# Flutter / Dart / Pub
 **/doc/api/
 .dart_tool/
 .flutter-plugins-dependencies
@@ -32,14 +30,57 @@ migrate_working_dir/
 /build/
 /coverage/
 
-# Symbolication related
+# Generated debugging files
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
 
+# Vercel local project settings
+.vercel/
 
-# AI agent skills
+# Local environment files
+.env
+.env.*
+
+# All personal trip photos and videos
+# Includes every current and future trip subfolder
+/assets/memories/
+
+# Local reports and temporary files
+/artifacts/
+/tmp/
+/design-qa.md
+
+# Restricted media and associated licenses
+/assets/audio/*
+/assets/fonts/golifez_bright_demo.otf
+/assets/licenses/epidemic_sound_fire_effect.txt
+/assets/licenses/golifez_bright_demo_eula.txt
+
+# Local media import helpers
+/tool/download_*_highlight.sh
+/tool/import_*_highlight.sh
+/tool/import_*_highlights.sh
+/tool/import_japan_*.sh
+/tool/organize_china_by_location.sh
+/tool/generate_*_video_posters.swift
+
+# Local hardware files
+/hardware/
+
+# Generated CAD, mesh, and archive files
+*.3mf
+*.fbx
+*.gcode
+*.glb
+*.step
+*.stl
+*.stp
+*.zip
+**/previews/
+**/snapshots/
+**/*_review.json
+
+# Local AI agent configuration
 .agent
 .agents
 .augment
@@ -53,52 +94,5 @@ app.*.map.json
 .trae
 .windsurf
 
-# Local environment files
-.env
-.env.*
-
-# Private travel media and derived captures. These remain available locally,
-# but must never be included in the public repository.
-/assets/memories/
-/assets/images/japan/
-/assets/images/trips/
-/assets/images/taste/*.jpg
-/models/fridge_magnet/reference_images/
-/artifacts/
-/tmp/
-/design-qa.md
-
-# Restricted media remains excluded from public commits.
-/assets/audio/*
-/assets/fonts/golifez_bright_demo.otf
-/assets/licenses/epidemic_sound_fire_effect.txt
-/assets/licenses/golifez_bright_demo_eula.txt
-
-# Local private-media import helpers and generated reports.
-/tool/download_*_highlight.sh
-/tool/import_*_highlight.sh
-/tool/import_*_highlights.sh
-/tool/import_japan_*.sh
-/tool/organize_china_by_location.sh
-/tool/generate_*_video_posters.swift
-
-# Hardware CAD includes multi-gigabyte generated exports and third-party mesh
-# inputs. It stays in the local product workspace, outside the public app repo.
-/hardware/
-
-# Generated CAD/mesh packages elsewhere are reproducible and too large for
-# ordinary GitHub source control.
-*.3mf
-*.fbx
-*.gcode
-*.glb
-*.step
-*.stl
-*.stp
-*.zip
-**/previews/
-**/snapshots/
-**/*_review.json
-
-# Local agent/project instructions contain deployment-specific endpoints.
+# Local project instructions
 /AGENTS.md

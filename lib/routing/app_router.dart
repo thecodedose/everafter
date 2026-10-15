@@ -1,5 +1,4 @@
 import 'package:everafter/screens/gallery_admin_screen.dart';
-import 'package:everafter/screens/taste_of_japan_screen.dart';
 import 'package:everafter/screens/trip_experience_screen.dart';
 import 'package:everafter/screens/trip_not_found_screen.dart';
 import 'package:everafter/data/trip_catalog.dart';
@@ -46,18 +45,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             query: state.uri.hasQuery ? state.uri.query : null,
           ).toString(),
         ),
-      GoRoute(
-        path: '/taste/:slug',
-        pageBuilder: (context, state) {
-          final trip = tripForSlug(state.pathParameters['slug']);
-          return NoTransitionPage<void>(
-            key: state.pageKey,
-            child: trip == null
-                ? const TripNotFoundScreen()
-                : TripTasteMenuScreen(trip: trip),
-          );
-        },
-      ),
       GoRoute(
         path: '/admin/gallery',
         pageBuilder: (context, state) => NoTransitionPage<void>(

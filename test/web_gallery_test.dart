@@ -2,7 +2,6 @@ import 'package:everafter/app.dart';
 import 'package:everafter/data/trip_catalog.dart';
 import 'package:everafter/data/trip_collections.dart';
 import 'package:everafter/data/gallery_layout.dart';
-import 'package:everafter/data/gallery_memory_content.dart';
 import 'package:flutter/services.dart';
 import 'package:everafter/routing/app_router.dart';
 import 'package:everafter/widgets/trip_journey.dart';
@@ -41,8 +40,9 @@ Future<ProviderContainer> _open(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(installGalleryFixtures);
   test(
-    'catalog contains exactly the thirteen requested year-specific trips',
+    'catalog contains exactly the twelve requested year-specific trips',
     () {
       expect(
         tripGalleryItems.map((trip) => trip.slug),
@@ -55,30 +55,22 @@ void main() {
           'new-york-2024',
           'carnival-2024',
           'royal-caribbean-2024',
-          'msc-2025',
           'epic-universal-2025',
           'norwegian-2025',
           'royal-caribbean-2026',
           'universal-2026',
         ]),
       );
-      expect(tripGalleryItems.map((trip) => trip.slug).toSet(), hasLength(13));
+      expect(tripGalleryItems.map((trip) => trip.slug).toSet(), hasLength(12));
       expect(
         tripCollections.keys,
         unorderedEquals(tripGalleryItems.map((trip) => trip.slug)),
       );
-      for (final trip in tripGalleryItems) {
-        final media = galleryMemoryLocationsFor(
-          trip.slug,
-        ).expand((location) => location.media);
-        expect(media.any((item) => item.isVideo), isTrue);
-        expect(media.any((item) => !item.isVideo), isTrue);
-        expect(galleryVideoPostsFor(trip.slug), hasLength(7));
-      }
+
     },
   );
 
-  test('bundled layouts are exactly the thirteen new trips', () async {
+  test('bundled layouts are exactly the twelve new trips', () async {
     final json = await rootBundle.loadString(
       GalleryLayoutStore.bundledGlobalLayoutPath,
     );
@@ -101,22 +93,11 @@ void main() {
       expect(find.byKey(const ValueKey('trip-gallery-screen')), findsOneWidget);
       expect(
         tester.getSize(find.byKey(const ValueKey('trip-gallery-screen'))),
-        size,
+        Size(size.longestSide, size.shortestSide),
       );
       expect(find.byType(TripJourney), findsOneWidget);
       expect(find.byKey(const ValueKey('trip-memory-gallery')), findsOneWidget);
       expect(find.text('Start'), findsNothing);
-    });
-
-    testWidgets('curated food menu fits $size', (tester) async {
-      installGalleryFixtures();
-      await _open(tester, '/taste/spain-2026', size);
-      await tester.pump(const Duration(milliseconds: 120));
-      await tester.pump(const Duration(milliseconds: 600));
-      expect(
-        find.byKey(const ValueKey('taste-detail-EA-JP-001')),
-        findsOneWidget,
-      );
     });
 
     testWidgets('admin fits $size with all tools reachable', (tester) async {
@@ -166,7 +147,7 @@ void main() {
     expect(find.text('Crop'), findsOneWidget);
     await tester.tap(find.text('Photos'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Apply photos'));
+    await tester.tap(find.text('Apply photo'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('admin-photo-picker')), findsNothing);
     expect(

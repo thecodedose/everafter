@@ -22,27 +22,47 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
   assets:
+    # Gallery layouts
     - assets/data/gallery_layouts.json
-    - assets/video/public-demo-memory.mp4
-    - assets/images/taste/embossed_food_frame.png
-    - assets/images/taste/lace_menu_frame.png
+    - assets/data/photo_dimensions.json
+
+    # Personal trip photos and videos
+    - assets/memories/spain-2026/
+    - assets/memories/paris-2026/
+    - assets/memories/georgia-aquarium-2026/
+    - assets/memories/philippines-2025/
+    - assets/memories/washington-2022/
+    - assets/memories/new-york-2024/
+    - assets/memories/carnival-2024/
+    - assets/memories/royal-caribbean-2024/
+    - assets/memories/epic-universal-2025/
+    - assets/memories/norwegian-2025/
+    - assets/memories/royal-caribbean-2026/
+    - assets/memories/universal-2026/
+
+    # Gallery frames and decorations
     - assets/images/experience/baroque-frame-circular-hd.png
     - assets/images/experience/baroque-frame-horizontal-oval-hd.png
     - assets/images/experience/baroque-frame-landscape-hd.png
     - assets/images/experience/baroque-frame-oval-hd.png
     - assets/images/experience/baroque-frame-portrait-hd.png
     - assets/images/experience/china-nfc-magnet-reveal.png
-    - assets/images/experience/earth-globe-fallback.png
     - assets/images/experience/hong-kong-nfc-magnet-reveal.png
     - assets/images/experience/japan-nfc-magnet-reveal-fox.png
-    - assets/images/experience/museum-spotlight-overlay.png
     - assets/images/experience/taiwan-nfc-magnet-reveal-bubble-tea.png
     - assets/images/experience/vietnam-nfc-magnet-reveal-lotus.png
+    - assets/images/experience/earth-globe-fallback.png
+    - assets/images/experience/museum-spotlight-overlay.png
+
+    # Gallery wall textures
     - assets/textures/texturelabs_paper_320.jpg
     - assets/textures/warm_linen_canvas_fine.jpg
     - assets/textures/warm_linen_canvas_visible.jpg
     - assets/textures/red_damask_gallery_wall.jpeg
+
+    # Asset licenses
     - assets/licenses/erratic_cursive_cc0.txt
     - assets/licenses/erratic_cursive_eula.txt
     - assets/licenses/nasa_blue_marble.txt
@@ -53,6 +73,7 @@ flutter:
     - family: ErraticCursive
       fonts:
         - asset: assets/fonts/erratic_cursive_regular.otf
+
     - family: Roboto
       fonts:
         - asset: assets/fonts/Roboto-Regular.ttf

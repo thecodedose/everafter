@@ -1,6 +1,6 @@
 {
-  "name": "EverAfter Travel Gallery",
-  "short_name": "EverAfter",
+  "name": "Trip Highlights",
+  "short_name": "Trip Highlights",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#171716",

@@ -1,3 +1,5 @@
+import 'package:everafter/data/photo_metadata.dart';
+import 'package:everafter/widgets/photo_viewer.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -8,16 +10,16 @@ import 'package:everafter/theme/everafter_theme.dart';
 import 'package:everafter/widgets/gallery_trinket_image.dart';
 import 'package:everafter/widgets/memory_video_surface_stub.dart'
     if (dart.library.js_interop) 'package:everafter/widgets/memory_video_surface_web.dart';
-import 'package:everafter/widgets/museum_widgets.dart';
 import 'package:everafter/data/trip_catalog.dart';
 import 'package:everafter/models/gallery_media.dart';
+import 'package:everafter/services/photo_download.dart';
 import 'package:flutter/material.dart';
 
 const double _spotlightStartProgress = 0.58;
 const double _instagramReelAspectRatio = 9 / 16;
 
 double _galleryEditorialTitleLeft(TripGalleryItem trip) =>
-    galleryEditorialTitleLeft;
+    GalleryLayoutStore.instance.layoutFor(trip.slug).editorialTitleLeft;
 
 bool galleryAutoplaysVideosFor(TripGalleryItem _) => false;
 
@@ -27,10 +29,9 @@ bool memoryMediaUsesColorTreatment({
 }) => !(isVideo && isPlaying);
 
 class TripJourney extends StatefulWidget {
-  const TripJourney({required this.trip, required this.onTasteTap, super.key});
+  const TripJourney({required this.trip, super.key});
 
   final TripGalleryItem trip;
-  final Future<void> Function() onTasteTap;
 
   @override
   State<TripJourney> createState() => TripJourneyState();
@@ -297,7 +298,6 @@ class TripJourneyState extends State<TripJourney>
                                   widget.trip,
                                 ),
                                 onMemoryTap: _focusMemory,
-                                onTasteTap: widget.onTasteTap,
                               ),
                             ),
                           ),
@@ -306,7 +306,19 @@ class TripJourneyState extends State<TripJourney>
                     ),
                   ),
                 if (_focusedMemory case final memory?)
-                  _FocusedMemoryOverlay(
+                  if (!memory.media[_focusedMediaIndex!].isVideo)
+                    PhotoViewer(
+                      key: ValueKey('focused-memory-${memory.id}'),
+                      assetPath: memory.media[_focusedMediaIndex!].assetPath,
+                      aspectRatio: galleryPhotoAspectRatios[memory.media[_focusedMediaIndex!].assetPath]
+                          ?? _focusedMemorySourceRect!.width / _focusedMemorySourceRect!.height,
+                      label: memory.locationLabel ?? widget.trip.name,
+                      sourceRect: _focusedMemorySourceRect!,
+                      progress: focusProgress,
+                      transformationController: _focusedMediaTransformationController,
+                      onDismiss: _dismissFocusedMemory,
+                    )
+                  else _FocusedMemoryOverlay(
                     key: ValueKey('focused-memory-${memory.id}'),
                     memory: memory,
                     sourceRect: _focusedMemorySourceRect!,
@@ -343,14 +355,16 @@ class TripJourneyState extends State<TripJourney>
       );
     }
 
-    final compact = viewport.width < 600;
+    const toolbarHeight = 56.0;
+    const bottomControlsHeight = 44.0;
+    final availableHeight = math.max(40.0, viewport.height - toolbarHeight - bottomControlsHeight);
     final targetScale = math.min(
-      viewport.width * 0.92 / sourceRect.width,
-      viewport.height * (compact ? 0.65 : 0.9) / sourceRect.height,
+      math.max(40.0, viewport.width - 32) / sourceRect.width,
+      availableHeight / sourceRect.height,
     );
     final targetCenter = Offset(
       viewport.width / 2,
-      viewport.height * (compact ? 0.42 : 0.5),
+      toolbarHeight + availableHeight / 2,
     );
     final scale = 1 + (targetScale - 1) * progress;
     final targetTranslation = targetCenter - sourceRect.center * targetScale;
@@ -391,7 +405,6 @@ class _BaroqueGalleryWall extends StatelessWidget {
     required this.slideshowTick,
     required this.autoplayVideos,
     required this.onMemoryTap,
-    required this.onTasteTap,
     super.key,
   });
 
@@ -422,7 +435,6 @@ class _BaroqueGalleryWall extends StatelessWidget {
   final int slideshowTick;
   final bool autoplayVideos;
   final void Function(_FocusedMemory memory, Rect globalFrameRect) onMemoryTap;
-  final Future<void> Function() onTasteTap;
 
   @override
   Widget build(BuildContext context) {
@@ -509,7 +521,6 @@ class _BaroqueGalleryWall extends StatelessWidget {
                                   slideshowTick: slideshowTick,
                                   autoplayVideos: autoplayVideos,
                                   onMemoryTap: onMemoryTap,
-                                  onTasteTap: onTasteTap,
                                   copyIndex: copyIndex,
                                 ),
                               ),
@@ -535,7 +546,6 @@ class _GalleryStrip extends StatelessWidget {
     required this.slideshowTick,
     required this.autoplayVideos,
     required this.onMemoryTap,
-    required this.onTasteTap,
     required this.copyIndex,
   });
 
@@ -547,7 +557,6 @@ class _GalleryStrip extends StatelessWidget {
   final int slideshowTick;
   final bool autoplayVideos;
   final void Function(_FocusedMemory memory, Rect globalFrameRect) onMemoryTap;
-  final Future<void> Function() onTasteTap;
   final int copyIndex;
 
   @override
@@ -561,7 +570,7 @@ class _GalleryStrip extends StatelessWidget {
             left: 72,
             top: 32,
             child: Text(
-              'EVERAFTER  /  TRIP ${trip.number.toString().padLeft(2, '0')}',
+              'TRIP HIGHLIGHTS  /  TRIP ${trip.number.toString().padLeft(2, '0')}',
               style: const TextStyle(
                 fontFamily: 'Georgia',
                 color: EverAfterColors.agedPaper,
@@ -585,20 +594,6 @@ class _GalleryStrip extends StatelessWidget {
               ),
           for (final frame in layout.frames)
             if (frame.visible) _memoryFromPlacement(frame),
-          Positioned(
-            left: layout.foodMenu.left,
-            top: layout.foodMenu.top,
-            width: layout.foodMenu.width,
-            height: layout.foodMenu.height,
-            child: Transform.rotate(
-              angle: layout.foodMenu.angle,
-              child: _TripTasteGalleryMenu(
-                key: ValueKey('taste-of-${trip.slug}-menu-$copyIndex'),
-                trip: trip,
-                onTap: onTasteTap,
-              ),
-            ),
-          ),
           _EditorialGalleryTitle(
             trip: trip,
             dateRangeLabel: layout.effectiveDateRangeLabel(trip.dateRangeLabel),
@@ -820,669 +815,6 @@ class _OrganicGalleryKeepsake extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _TripTasteGalleryMenu extends StatefulWidget {
-  const _TripTasteGalleryMenu({
-    required this.trip,
-    required this.onTap,
-    super.key,
-  });
-
-  final TripGalleryItem trip;
-  final Future<void> Function() onTap;
-
-  @override
-  State<_TripTasteGalleryMenu> createState() => _TripTasteGalleryMenuState();
-}
-
-class _TripTasteGalleryMenuState extends State<_TripTasteGalleryMenu>
-    with TickerProviderStateMixin {
-  late final AnimationController _liftController = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 80),
-    reverseDuration: const Duration(milliseconds: 130),
-  );
-  late final AnimationController _openController = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 650),
-    reverseDuration: const Duration(milliseconds: 480),
-  );
-  late final AnimationController _pageSettleController = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 120),
-  );
-  late final AnimationController _pageZoomController = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 650),
-    reverseDuration: const Duration(milliseconds: 540),
-  );
-  late final AnimationController _textureSettleController = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 450),
-  );
-  OverlayEntry? _pageOverlay;
-  bool _opening = false;
-  bool _landing = false;
-
-  @override
-  void dispose() {
-    _removePageOverlay();
-    _textureSettleController.dispose();
-    _pageZoomController.dispose();
-    _pageSettleController.dispose();
-    _openController.dispose();
-    _liftController.dispose();
-    super.dispose();
-  }
-
-  Rect? _pageRectInOverlay(OverlayState overlay) {
-    final menuBox = context.findRenderObject() as RenderBox?;
-    final overlayBox = overlay.context.findRenderObject() as RenderBox?;
-    if (menuBox == null || overlayBox == null || !menuBox.hasSize) {
-      return null;
-    }
-    return MatrixUtils.transformRect(
-      menuBox.getTransformTo(overlayBox),
-      Offset.zero & menuBox.size,
-    );
-  }
-
-  void _showPageOverlay({required bool expanded}) {
-    _removePageOverlay();
-    final overlay = Overlay.of(context, rootOverlay: true);
-    _pageZoomController.value = expanded ? 1 : 0;
-    _textureSettleController.value = expanded ? 1 : 0;
-    _pageOverlay = OverlayEntry(
-      builder: (context) {
-        return AnimatedBuilder(
-          animation: Listenable.merge(<Listenable>[
-            _pageZoomController,
-            _textureSettleController,
-          ]),
-          builder: (context, child) {
-            final sourceRect = _pageRectInOverlay(overlay);
-            final overlayBox = overlay.context.findRenderObject() as RenderBox?;
-            if (sourceRect == null || overlayBox == null) {
-              return const SizedBox.shrink();
-            }
-            final progress = Curves.easeInOutCubic.transform(
-              _pageZoomController.value,
-            );
-            final viewportRect = Offset.zero & overlayBox.size;
-            final targetScale = math.max(
-              viewportRect.width / sourceRect.width,
-              viewportRect.height / sourceRect.height,
-            );
-            final cameraScale = ui.lerpDouble(1, targetScale, progress)!;
-            final pageRect = Rect.fromCenter(
-              center: Offset.lerp(
-                sourceRect.center,
-                viewportRect.center,
-                progress,
-              )!,
-              width: sourceRect.width * cameraScale,
-              height: sourceRect.height * cameraScale,
-            );
-            final coverRect = Rect.fromLTWH(
-              pageRect.left - (pageRect.width * 0.965),
-              pageRect.top,
-              pageRect.width,
-              pageRect.height,
-            );
-            final spineWidth = math.max(3.0, pageRect.width * 0.025);
-            final textureCameraScale =
-                (sourceRect.height * targetScale) / viewportRect.height;
-            final textureSettleProgress = Curves.easeOutCubic.transform(
-              _textureSettleController.value,
-            );
-            final textureScale = ui.lerpDouble(
-              textureCameraScale,
-              1,
-              textureSettleProgress,
-            )!;
-            final textureOpacity = const Interval(
-              0,
-              0.08,
-              curve: Curves.easeOut,
-            ).transform(_textureSettleController.value);
-            return IgnorePointer(
-              child: Stack(
-                fit: StackFit.expand,
-                children: <Widget>[
-                  Positioned.fill(
-                    child: BackdropFilter(
-                      key: const ValueKey('taste-page-backdrop-blur'),
-                      filter: ui.ImageFilter.blur(
-                        sigmaX: 3.5 * progress,
-                        sigmaY: 3.5 * progress,
-                      ),
-                      child: ColoredBox(
-                        color: Color.fromRGBO(24, 16, 10, 0.08 * progress),
-                      ),
-                    ),
-                  ),
-                  Positioned.fromRect(
-                    rect: coverRect,
-                    child: KeyedSubtree(
-                      key: const ValueKey('taste-attached-open-cover'),
-                      child: Transform.rotate(
-                        alignment: Alignment.centerRight,
-                        angle: 0.012 * (1 - progress),
-                        child: const _TasteMenuCoverInside(),
-                      ),
-                    ),
-                  ),
-                  Positioned.fromRect(
-                    rect: pageRect,
-                    child: KeyedSubtree(
-                      key: const ValueKey('taste-page-zoom-overlay'),
-                      child: Transform.rotate(
-                        angle: -0.018 * (1 - progress),
-                        child: _TasteBlankPage(
-                          borderRadius: 2 * (1 - progress),
-                          elevationProgress: 1 - progress,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned.fromRect(
-                    rect: Rect.fromLTWH(
-                      pageRect.left - (spineWidth * 0.55),
-                      pageRect.top,
-                      spineWidth,
-                      pageRect.height,
-                    ),
-                    child: const KeyedSubtree(
-                      key: ValueKey('taste-attached-book-spine'),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: <Color>[
-                              Color(0x66180E08),
-                              Color(0xAA3A2717),
-                              Color(0x557A5A34),
-                              Color(0x00180E08),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned.fill(
-                    child: Opacity(
-                      key: const ValueKey('taste-texture-settle-opacity'),
-                      opacity: textureOpacity,
-                      child: Transform.scale(
-                        key: const ValueKey('taste-texture-settle-scale'),
-                        scale: textureScale,
-                        alignment: Alignment.center,
-                        child: const WarmLinenTexture(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-    overlay.insert(_pageOverlay!);
-  }
-
-  void _removePageOverlay() {
-    _pageOverlay?.remove();
-    _pageOverlay = null;
-  }
-
-  Future<void> _openMenu() async {
-    if (_opening) return;
-    setState(() => _opening = true);
-    await _liftController.forward(from: 0);
-    if (!mounted) return;
-    await _openController.forward(from: 0);
-    if (!mounted) return;
-    await _pageSettleController.forward(from: 0);
-    if (!mounted) return;
-
-    try {
-      _showPageOverlay(expanded: false);
-      await Future<void>.delayed(const Duration(milliseconds: 90));
-      if (!mounted) return;
-      await _pageZoomController.forward();
-      if (!mounted) return;
-
-      await _textureSettleController.forward();
-      if (!mounted) return;
-      final route = widget.onTap();
-      await Future<void>.delayed(const Duration(milliseconds: 80));
-      _removePageOverlay();
-      await route;
-
-      if (!mounted) return;
-      _showPageOverlay(expanded: true);
-      await _textureSettleController.reverse();
-      await _pageZoomController.reverse();
-      _removePageOverlay();
-    } finally {
-      _removePageOverlay();
-      if (mounted) {
-        await _openController.reverse();
-      }
-      if (mounted) {
-        _landing = true;
-        await _liftController.reverse();
-        _landing = false;
-        _pageSettleController.value = 0;
-      }
-      if (mounted) {
-        setState(() => _opening = false);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _liftController,
-      builder: (context, child) {
-        final lift = Curves.easeOutCubic.transform(_liftController.value);
-        final landingProgress = 1 - _liftController.value;
-        final landingOffset = _landing
-            ? math.sin(math.pi * landingProgress) * 1.2
-            : 0.0;
-        return Transform.translate(
-          key: const ValueKey('taste-menu-lift'),
-          offset: Offset(0, (-4 * lift) + landingOffset),
-          child: Transform.scale(
-            scale: 1 + (0.012 * lift),
-            child: Transform.rotate(
-              angle: -0.018 + (0.006 * lift),
-              child: child,
-            ),
-          ),
-        );
-      },
-      child: Semantics(
-        button: true,
-        label: 'Open Taste of ${widget.trip.name} tasting menu',
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: _openMenu,
-              borderRadius: BorderRadius.circular(2),
-              child: AnimatedBuilder(
-                animation: Listenable.merge(<Listenable>[
-                  _openController,
-                  _pageSettleController,
-                ]),
-                builder: (context, child) {
-                  final progress = const Cubic(
-                    0.65,
-                    0,
-                    0.35,
-                    1,
-                  ).transform(_openController.value);
-                  final angle = math.pi * 0.92 * progress;
-                  final movingLight = math.sin(math.pi * progress).clamp(0, 1);
-                  final hingeShadow = progress * (0.18 + 0.5 * movingLight);
-                  final settledScale =
-                      TweenSequence<double>(<TweenSequenceItem<double>>[
-                        TweenSequenceItem<double>(
-                          tween: Tween<double>(begin: 0.985, end: 1.012),
-                          weight: 68,
-                        ),
-                        TweenSequenceItem<double>(
-                          tween: Tween<double>(begin: 1.012, end: 1),
-                          weight: 32,
-                        ),
-                      ]).transform(_pageSettleController.value);
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: <Widget>[
-                      Positioned.fill(
-                        child: Opacity(
-                          key: const ValueKey('taste-menu-inside-reveal'),
-                          opacity: const Interval(
-                            0.08,
-                            0.62,
-                            curve: Curves.easeOut,
-                          ).transform(progress),
-                          child: Transform.scale(
-                            key: const ValueKey('taste-menu-page-settle'),
-                            alignment: Alignment.centerLeft,
-                            scale: settledScale,
-                            child: const _TasteMenuInside(),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        left: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: 24,
-                        child: IgnorePointer(
-                          child: Opacity(
-                            key: const ValueKey('taste-menu-hinge-shadow'),
-                            opacity: hingeShadow.clamp(0, 0.72),
-                            child: const DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: <Color>[
-                                    Color(0x880D0805),
-                                    Color(0x281D120B),
-                                    Color(0x001D120B),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned.fill(
-                        child: Transform(
-                          key: const ValueKey('taste-menu-cover-flip'),
-                          alignment: Alignment.centerLeft,
-                          transform: Matrix4.identity()
-                            ..setEntry(3, 2, 0.0018)
-                            ..rotateY(-angle),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: <Widget>[
-                              if (angle <= math.pi / 2)
-                                child!
-                              else
-                                Transform(
-                                  alignment: Alignment.center,
-                                  transform: Matrix4.rotationY(math.pi),
-                                  child: const _TasteMenuCoverInside(),
-                                ),
-                              IgnorePointer(
-                                child: Opacity(
-                                  key: const ValueKey(
-                                    'taste-menu-cover-highlight',
-                                  ),
-                                  opacity: 0.28 * movingLight,
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment(
-                                          -1.8 + (2.4 * progress),
-                                          -0.2,
-                                        ),
-                                        end: Alignment(
-                                          -0.6 + (2.4 * progress),
-                                          0.2,
-                                        ),
-                                        colors: const <Color>[
-                                          Color(0x00FFF8E8),
-                                          Color(0xAAFFF8E8),
-                                          Color(0x00FFF8E8),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-                child: _TasteLaceMenuCover(trip: widget.trip),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TasteLaceMenuCover extends StatelessWidget {
-  const _TasteLaceMenuCover({required this.trip});
-
-  final TripGalleryItem trip;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: EverAfterColors.agedPaper,
-        border: Border.all(color: const Color(0xFFB19369), width: 2),
-        boxShadow: const <BoxShadow>[
-          BoxShadow(
-            color: Color(0x99000000),
-            blurRadius: 14,
-            offset: Offset(5, 8),
-          ),
-          BoxShadow(
-            color: Color(0x552D1A0D),
-            blurRadius: 2,
-            offset: Offset(1, 2),
-          ),
-        ],
-      ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: <Widget>[
-          Opacity(
-            opacity: 0.2,
-            child: Image.asset(
-              'assets/textures/warm_linen_canvas_visible.jpg',
-              fit: BoxFit.cover,
-              color: const Color(0xFFE1C894),
-              colorBlendMode: BlendMode.multiply,
-              excludeFromSemantics: true,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: EverAfterColors.ink.withValues(alpha: 0.48),
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 10, 8, 9),
-                child: Column(
-                  children: <Widget>[
-                    Text(
-                      'EVERAFTER · MENU ${trip.number.toString().padLeft(2, '0')}',
-                      maxLines: 1,
-                      style: const TextStyle(
-                        fontFamily: 'Georgia',
-                        color: EverAfterColors.ink,
-                        fontSize: 6.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.9,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFB73B2E),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF87251F)),
-                      ),
-                      child: Center(
-                        child: Text(
-                          trip.location.substring(0, 1).toUpperCase(),
-                          style: const TextStyle(
-                            color: Color(0xFFF4E6CB),
-                            fontSize: 16,
-                            height: 1,
-                            decoration: TextDecoration.none,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 7),
-                    SizedBox(
-                      height: 36,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          'TASTE OF\n${trip.name.toUpperCase()}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontFamily: 'Georgia',
-                            color: EverAfterColors.ink,
-                            fontSize: 23,
-                            height: 0.91,
-                            letterSpacing: 1.2,
-                            decoration: TextDecoration.none,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 7),
-                    Container(
-                      width: 28,
-                      height: 1,
-                      color: EverAfterColors.ink.withValues(alpha: 0.42),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'CAFÉS · MARKETS · MEALS',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: 'Georgia',
-                        color: EverAfterColors.warmBrown,
-                        fontSize: 6.4,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.6,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                    const Spacer(),
-                    const Text(
-                      'TAP TO OPEN',
-                      style: TextStyle(
-                        fontFamily: 'Georgia',
-                        color: EverAfterColors.ink,
-                        fontSize: 7,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.15,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TasteMenuInside extends StatelessWidget {
-  const _TasteMenuInside();
-
-  @override
-  Widget build(BuildContext context) {
-    return const _TasteBlankPage(borderRadius: 0, elevationProgress: 1);
-  }
-}
-
-class _TasteBlankPage extends StatelessWidget {
-  const _TasteBlankPage({
-    required this.borderRadius,
-    required this.elevationProgress,
-  });
-
-  final double borderRadius;
-  final double elevationProgress;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8D5A9),
-        borderRadius: BorderRadius.circular(borderRadius),
-        border: Border.all(
-          color: Color.lerp(
-            const Color(0xFFA17D50),
-            const Color(0x00A17D50),
-            1 - elevationProgress,
-          )!,
-          width: 2,
-        ),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Color.fromRGBO(29, 16, 8, 0.62 * elevationProgress),
-            blurRadius: 22 * elevationProgress,
-            offset: Offset(8 * elevationProgress, 12 * elevationProgress),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(borderRadius),
-        child: const WarmLinenTexture(),
-      ),
-    );
-  }
-}
-
-class _TasteMenuCoverInside extends StatelessWidget {
-  const _TasteMenuCoverInside();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFFDCC28D),
-        border: Border.all(color: const Color(0xFFA17D50), width: 2),
-        boxShadow: const <BoxShadow>[
-          BoxShadow(
-            color: Color(0x7723150B),
-            blurRadius: 12,
-            offset: Offset(-5, 5),
-          ),
-        ],
-      ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: <Widget>[
-          Opacity(
-            opacity: 0.2,
-            child: Image.asset(
-              'assets/textures/warm_linen_canvas_visible.jpg',
-              fit: BoxFit.cover,
-              color: const Color(0xFFD4B577),
-              colorBlendMode: BlendMode.multiply,
-              excludeFromSemantics: true,
-            ),
-          ),
-          Center(
-            child: Transform.rotate(
-              angle: -0.08,
-              child: const Text(
-                'いただきます',
-                style: TextStyle(
-                  color: Color(0x66745A3A),
-                  fontSize: 12,
-                  letterSpacing: 2,
-                  decoration: TextDecoration.none,
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1962,7 +1294,8 @@ class _FocusedMemoryOverlay extends StatelessWidget {
                 mediaIndex: slideshowIndex,
                 imageViewportKey: const ValueKey('focused-memory-image'),
                 playVideos: progress >= 0.98,
-                showFrame: false,
+                showFrame: true,
+                showFullImage: true,
               );
         final transitionFrame = memory.instagramPost != null
             ? _BaroqueInstagramPostFrame(
@@ -2156,7 +1489,7 @@ class _FocusedMemoryOverlay extends StatelessWidget {
                     offset: Offset(-18 * (1 - placardProgress), 0),
                     child: Opacity(
                       opacity: placardProgress,
-                      child: _FocusedLocationPlacard(label: label),
+                      child: GalleryLocationPlacard(label: label),
                     ),
                   ),
                 ),
@@ -2218,6 +1551,28 @@ class _FocusedMemoryOverlay extends StatelessWidget {
               ),
             ),
             if (progress >= 0.98 &&
+                !memory.media[slideshowIndex].isVideo)
+              Positioned(
+                right: MediaQuery.paddingOf(context).right + 12,
+                top: MediaQuery.paddingOf(context).top + 12,
+                child: FilledButton.icon(
+                  key: const ValueKey('save-memory-image'),
+                  icon: const Icon(Icons.download),
+                  label: const Text('Save image'),
+                  onPressed: () async {
+                    try {
+                      await saveGalleryPhoto(memory.media[slideshowIndex].assetPath);
+                    } catch (_) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                          const SnackBar(content: Text('The browser could not start the image download.')),
+                        );
+                      }
+                    }
+                  },
+                ),
+              ),
+            if (progress >= 0.98 &&
                 (memory.instagramPost != null ||
                     memory.media[slideshowIndex].isVideo))
               Positioned(
@@ -2241,7 +1596,7 @@ Rect _focusedLocationPlacardRect({
   required Size viewport,
   required Rect frameRect,
 }) {
-  if (viewport.width < 600) {
+  if (viewport.width < viewport.height) {
     final width = math.min(168.0, viewport.width - 32);
     final height = width * 0.72;
     final maxTop = math.max(16.0, viewport.height - height - 80);
@@ -2267,8 +1622,8 @@ Rect _focusedLocationPlacardRect({
   return Rect.fromLTWH(left, top, width, height);
 }
 
-class _FocusedLocationPlacard extends StatelessWidget {
-  const _FocusedLocationPlacard({required this.label});
+class GalleryLocationPlacard extends StatelessWidget {
+  const GalleryLocationPlacard({required this.label, super.key});
 
   final String label;
 
@@ -2309,7 +1664,12 @@ class _FocusedLocationPlacard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
                 child: ExcludeSemantics(
-                  child: Column(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: SizedBox(
+                      width: 140,
+                      child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
                       const Text(
@@ -2361,6 +1721,8 @@ class _FocusedLocationPlacard extends StatelessWidget {
                         ),
                       ),
                     ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -2477,8 +1839,8 @@ Rect _baroqueFramePhotoRect(_FrameKind kind, Size size) {
       0.7261,
       0.6036,
     ),
-    _FrameKind.portrait => const Rect.fromLTWH(0.2317, 0.1941, 0.5408, 0.6755),
-    _FrameKind.landscape => const Rect.fromLTWH(0.1324, 0.1709, 0.7336, 0.6667),
+    _FrameKind.portrait => const Rect.fromLTWH(0.2317, 0.1941, portraitApertureWidth, portraitApertureHeight),
+    _FrameKind.landscape => const Rect.fromLTWH(0.1324, 0.1709, landscapeApertureWidth, landscapeApertureHeight),
   };
   return Rect.fromLTWH(
     normalizedRect.left * size.width,
@@ -2500,6 +1862,7 @@ class _BaroqueMemoryFrame extends StatelessWidget {
     this.playVideos = false,
     this.slideshowId,
     this.showFrame = true,
+    this.showFullImage = false,
     this.muted = true,
   });
 
@@ -2513,6 +1876,7 @@ class _BaroqueMemoryFrame extends StatelessWidget {
   final bool playVideos;
   final String? slideshowId;
   final bool showFrame;
+  final bool showFullImage;
   final bool muted;
 
   String get _frameAsset => switch (kind) {
@@ -2566,11 +1930,11 @@ class _BaroqueMemoryFrame extends StatelessWidget {
                 )
               else
                 Transform.scale(
-                  scale: selectedMedia.zoom,
+                  scale: showFullImage ? 1 : selectedMedia.zoom,
                   child: Image.asset(
                     selectedMedia.displayAssetPath,
-                    fit: BoxFit.cover,
-                    alignment: mediaAlignment,
+                    fit: BoxFit.contain,
+                    alignment: showFullImage ? Alignment.center : mediaAlignment,
                     filterQuality: FilterQuality.high,
                     excludeFromSemantics: true,
                   ),

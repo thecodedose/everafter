@@ -68,7 +68,6 @@ const List<TripGalleryItem> tripGalleryItems = <TripGalleryItem>[
     year: 2024,
     slug: 'royal-caribbean-2024',
   ),
-  TripGalleryItem(number: 9, location: 'MSC', year: 2025, slug: 'msc-2025'),
   TripGalleryItem(
     number: 10,
     location: 'EPIC Universal',
@@ -94,3 +93,13 @@ const List<TripGalleryItem> tripGalleryItems = <TripGalleryItem>[
     slug: 'universal-2026',
   ),
 ];
+
+/// Newest year first; keep the original order within a year until dates exist.
+/// The canonical catalog stays unchanged so the home trip and IDs stay stable.
+final List<TripGalleryItem> tripGalleryItemsByYear =
+    List<TripGalleryItem>.unmodifiable(
+      List<TripGalleryItem>.of(tripGalleryItems)..sort((a, b) {
+        final byYear = b.year.compareTo(a.year);
+        return byYear != 0 ? byYear : a.number.compareTo(b.number);
+      }),
+    );

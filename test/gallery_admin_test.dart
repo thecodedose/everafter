@@ -95,14 +95,9 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.byKey(const ValueKey('admin-gallery-food-menu')),
-      findsOneWidget,
-    );
-    expect(
       find.byKey(const ValueKey('admin-instagram-instagram-0')),
       findsOneWidget,
     );
-    expect(find.text('TASTE OF SPAIN 2026'), findsOneWidget);
     expect(find.text('MEMORIES OF'), findsOneWidget);
     expect(find.text('SPAIN 2026'), findsOneWidget);
     expect(find.text('IN MOTION'), findsOneWidget);
@@ -150,22 +145,6 @@ void main() {
       greaterThan(instagramLeftBefore),
     );
 
-    final menuLeftBefore = GalleryLayoutStore.instance
-        .layoutFor('spain-2026')
-        .foodMenu
-        .left;
-    await tester.tap(find.byKey(const ValueKey('admin-gallery-food-menu')));
-    await tester.pump();
-    expect(find.text('Food menu'), findsWidgets);
-    await tester.drag(
-      find.byKey(const ValueKey('admin-gallery-food-menu')),
-      const Offset(14, 0),
-    );
-    await tester.pump();
-    expect(
-      GalleryLayoutStore.instance.layoutFor('spain-2026').foodMenu.left,
-      greaterThan(menuLeftBefore),
-    );
 
     await tester.tap(find.byKey(const ValueKey('admin-frame-frame-0')));
     await tester.pump();
@@ -239,7 +218,7 @@ void main() {
       find.byKey(ValueKey('admin-photo-choice-$unappliedPhotoIndex')),
       findsNothing,
     );
-    expect(find.text('Add photos'), findsOneWidget);
+    expect(find.text('Choose photo'), findsOneWidget);
     final dialogTheme = Theme.of(
       tester.element(find.byKey(const ValueKey('admin-add-frame-photos'))),
     );
@@ -279,7 +258,7 @@ void main() {
       find.byKey(const ValueKey('admin-photo-zoom-slider')),
       const Offset(45, 0),
     );
-    await tester.tap(find.text('Apply photos'));
+    await tester.tap(find.text('Apply photo'));
     await tester.pumpAndSettle();
     final editedPhotos = GalleryLayoutStore.instance
         .layoutFor('spain-2026')
@@ -348,7 +327,7 @@ void main() {
         home: SizedBox(
           width: 1280,
           height: 800,
-          child: TripJourney(trip: trip, onTasteTap: () async {}),
+          child: TripJourney(trip: trip),
         ),
       ),
     );
@@ -430,7 +409,7 @@ void main() {
     expect(find.text('JAN 02, 2025  →  JAN 05, 2025'), findsOneWidget);
   });
 
-  galleryTest('admin adds multi-photo frames and bundled trinkets', (
+  galleryTest('admin replaces the selected photo and adds bundled trinkets', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1280, 800));
@@ -444,7 +423,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('admin-add-item')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Frame with photos'));
+    await tester.tap(find.text('Frame with photo'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('admin-photo-picker')), findsOneWidget);
@@ -453,13 +432,13 @@ void main() {
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('admin-photo-choice-1')));
     await tester.pump();
-    await tester.tap(find.text('Apply photos'));
+    await tester.tap(find.text('Apply photo'));
     await tester.pumpAndSettle();
 
     final layoutWithFrame = store.layoutFor('spain-2026');
     expect(layoutWithFrame.frames, hasLength(initialLayout.frames.length + 1));
     expect(layoutWithFrame.frames.last.isCustom, isTrue);
-    expect(layoutWithFrame.frames.last.effectivePhotoEdits, hasLength(2));
+    expect(layoutWithFrame.frames.last.effectivePhotoEdits, hasLength(1));
     expect(
       find.byKey(ValueKey('admin-frame-${layoutWithFrame.frames.last.id}')),
       findsOneWidget,
@@ -596,9 +575,6 @@ void main() {
       ],
       'trinkets': <Map<String, Object>>[],
       'stripWidth': 9180,
-      'foodMenu': defaultFoodMenuPlacementFor(
-        'spain-2026',
-      ).copyWith(left: 780).toJson(),
       'instagramPosts': <Map<String, Object>>[
         for (final (index, left, style) in <(int, double, GalleryFrameStyle)>[
           (0, 470, GalleryFrameStyle.oval),
@@ -641,7 +617,6 @@ void main() {
     expect(migrated.instagramPosts.first.scale, 1.5);
     expect(migrated.instagramPosts.first.left, 538);
     expect(migrated.frames.first.left, 1329);
-    expect(migrated.foodMenu.left, 916);
     expect(migrated.stripWidth, 10260);
     expect(migrated.layoutVersion, 4);
     expect(
